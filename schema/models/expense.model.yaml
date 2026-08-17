@@ -1,0 +1,156 @@
+# =============================================================================
+# Domain: expenses
+# Entity: Expense
+# Description: One employee expense claim, Odoo 19 hr_expense semantics
+#              (spec: docs/odoo/human-resources/hr/
+#              hr-holidays-expense-business-logic.md, pillar-people H-4):
+#              NO sheet model (HEM-13) — grouping is a read projection and
+#              posting goes direct to the GL, one envelope per expense. The
+#              lifecycle is the TWO-FIELD SPLIT (HEB-4 + HEB-1/5, ADR-0016):
+#              `approval_state` is hand-set by the submit/approve/refuse
+#              verbs; `state` is the computed+stored financial lifecycle that
+#              advances approved → posted (GL ack) → done (reimbursed /
+#              company-paid). Legal (approval_state, state) pairs are enforced
+#              by a DB CHECK — the DB is the arbiter, per the W1 P2 doctrine.
+# =============================================================================
+
+models:
+  - name: Expense
+    collection: expenses
+    description: "An employee expense claim (per-category account, dual payment mode, two-field lifecycle)."
+
+    fields:
+      id:
+        type: uuid
+        attributes: ["@id", "@default(uuid)"]
+        description: "Unique record id"
+
+      company_id:
+        type: uuid
+        attributes: ["@required", "@exclude_from_foreign_key_check"]
+        description: "Org owner # logical FK organization.Company.id"
+
+      employee_id:
+        type: uuid
+        attributes: ["@required", "@exclude_from_foreign_key_check"]
+        description: "The claiming employee # logical FK employee.Employee.id"
+
+      category_id:
+        type: uuid
+        attributes: ["@required", "@exclude_from_foreign_key_check"]
+        description: "Expense classification # logical FK expenses.ExpenseCategory.id"
+
+      expense_date:
+        type: date
+        attributes: ["@required"]
+        description: "The date the expense was incurred"
+
+      description:
+        type: string
+        attributes: ["@required", "@length(max=500)"]
+        description: "What the expense was for"
+
+      amount_total:
+        type: decimal
+        attributes: ["@required"]
+        description: "Total claimed amount excluding tax (CHECK >= 0, HEM-C1)"
+
+      currency:
+        type: string
+        attributes: ["@default(\"IDR\")", "@max(3)"]
+        description: "ISO currency code — single-currency v1, no FX"
+
+      payment_mode:
+        type: ExpensePaymentMode
+        description: "Who paid upfront: employee (own_account, reimbursable) or company (company_account)"
+
+      reference:
+        type: string?
+        attributes: ["@length(max=200)"]
+        description: "Supplier document number / receipt ref on the claim"
+
+      approval_state:
+        type: ExpenseApprovalState
+        description: "Hand-set approval lifecycle (HEB-4): draft → submitted → approved | refused"
+
+      state:
+        type: ExpenseState
+        description: "Computed+stored financial lifecycle (HEB-1/5): advances approved → posted → done"
+
+      approval_request_id:
+        type: uuid?
+        attributes: ["@exclude_from_foreign_key_check"]
+        description: "Filed approval link # logical FK approvals.ApprovalRequest.id (seam, H-9)"
+
+      journal_id:
+        type: uuid?
+        attributes: ["@exclude_from_foreign_key_check"]
+        description: "GL journal the post landed in # logical FK accounting.journal.id (set at post)"
+
+      accounting_post_id:
+        type: uuid?
+        attributes: ["@exclude_from_foreign_key_check"]
+        description: "GL post ack id # logical FK accounting.accounting_post.id (set at post)"
+
+      reimbursement_id:
+        type: uuid?
+        attributes: ["@exclude_from_foreign_key_check"]
+        description: "Reimbursement ack id # logical FK payment.payment.id (set at settle)"
+
+      receipt_file_id:
+        type: uuid?
+        attributes: ["@exclude_from_foreign_key_check"]
+        description: "Receipt scan # logical FK bucket.stored_file.id (owner_module=expenses tags its side)"
+
+      metadata:
+        type: Metadata
+        attributes: ["@audit_metadata"]
+        description: "Audit metadata"
+
+    indexes:
+      - type: index
+        fields: [company_id, employee_id, expense_date]
+        description: "Report projection: group by employee over a date range"
+      - type: index
+        fields: [company_id, state]
+        description: "Workflow queues: pending approvals / to-post / to-settle per company"
+
+enums:
+  - name: ExpensePaymentMode
+    description: "Dual-mode posting (HEB-16/17): who is out of pocket initially"
+    variants:
+      - name: own_account
+        description: "Employee paid; company reimburses (in-receipt move, then payment)"
+        default: true
+      - name: company_account
+        description: "Company paid (card/cash); move hits the bank account directly"
+
+  - name: ExpenseApprovalState
+    description: "Hand-set approval lifecycle (HEB-4, AF1 shape)"
+    variants:
+      - name: draft
+        description: "Being written by the claimant"
+        default: true
+      - name: submitted
+        description: "Filed for approval"
+      - name: approved
+        description: "Approved (verdict honored)"
+      - name: refused
+        description: "Refused (sticky)"
+
+  - name: ExpenseState
+    description: "Computed+stored financial lifecycle (HEB-1/5, mirrors move.payment_state, AF2)"
+    variants:
+      - name: draft
+        description: "Not yet submitted"
+        default: true
+      - name: submitted
+        description: "Awaiting approval"
+      - name: approved
+        description: "Approved, not yet posted"
+      - name: posted
+        description: "GL post acknowledged (journal + post id stamped)"
+      - name: done
+        description: "Settled — reimbursed (own_account) or company-paid (company_account)"
+      - name: refused
+        description: "Refused; terminal unless re-submitted as a new claim"

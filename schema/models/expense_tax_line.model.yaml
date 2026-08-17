@@ -1,0 +1,65 @@
+# =============================================================================
+# Domain: expenses
+# Entity: ExpenseTaxLine
+# Description: The removable tax overlay (mirrors billing.invoice_tax_lines):
+#              PRE-COMPUTED tax lines supplied at claim time — input VAT to
+#              reclaim and/or withholding to deduct. Expenses never calls the
+#              tax engine and takes no backbone-tax dependency; an empty
+#              overlay is legal (removable = rows are optional).
+# =============================================================================
+
+models:
+  - name: ExpenseTaxLine
+    collection: expense_tax_lines
+    description: "Pre-computed tax overlay line on an expense claim (input VAT / withholding)."
+
+    fields:
+      id:
+        type: uuid
+        attributes: ["@id", "@default(uuid)"]
+        description: "Unique record id"
+
+      company_id:
+        type: uuid
+        attributes: ["@required", "@exclude_from_foreign_key_check"]
+        description: "Org owner # logical FK organization.Company.id"
+
+      expense_id:
+        type: uuid
+        attributes: ["@required", "@exclude_from_foreign_key_check"]
+        description: "The claim # logical FK expenses.Expense.id"
+
+      basis:
+        type: string
+        attributes: ["@required", "@length(max=32)"]
+        description: "'input' (reclaimable VAT, adds a debit) or 'withholding' (deducted from the credit)"
+
+      account_id:
+        type: uuid
+        attributes: ["@required", "@exclude_from_foreign_key_check"]
+        description: "GL tax account this line posts to # logical FK accounting.account.id"
+
+      description:
+        type: string?
+        attributes: ["@length(max=200)"]
+        description: "e.g. PPN 11%"
+
+      rate:
+        type: decimal
+        attributes: ["@required"]
+        description: "Tax rate in percent (audit copy of what was applied)"
+
+      tax_amount:
+        type: decimal
+        attributes: ["@required"]
+        description: "Pre-computed tax amount (CHECK >= 0)"
+
+      metadata:
+        type: Metadata
+        attributes: ["@audit_metadata"]
+        description: "Audit metadata"
+
+    indexes:
+      - type: index
+        fields: [expense_id]
+        description: "Overlay lookup per claim"
