@@ -1,0 +1,32 @@
+# Codegen policy for __MODULE__.
+#
+# `user_owned` globs are hand-written files that live inside generator-owned trees but are
+# NOT schema-derived. `metaphor schema generate [--force]` skips them wholesale (never reads,
+# merges, or deletes them). Everything else in src/ is regenerated from schema/models.
+#
+# Re-exports/declarations that must sit alongside generated code live inside
+# `// <<< CUSTOM ... // END CUSTOM` markers (service/mod.rs, presentation/http/mod.rs, lib.rs)
+# and are preserved by the marker mechanism, not listed here.
+#
+# Add your hand-authored services, handlers, tests, and docs below as you write them.
+
+user_owned:
+  # Hand-authored behavior: the validated write path (H-4) and its three seams.
+  - "src/application/service/expenses_write_service.rs"
+  - "src/application/service/expense_gl.rs"
+  - "src/application/service/approvals_port.rs"
+  - "src/application/service/reimbursement_port.rs"
+  # Every SQL statement the write path issues.
+  - "src/infrastructure/persistence/expenses_write_repository.rs"
+  # The guarded HTTP composition (validated verbs + report projection + safe reads).
+  - "src/presentation/http/guarded_routes.rs"
+  # Hand-written DB invariants (non-neg CHECKs + the state-pair CHECK, ADR-0016).
+  - "migrations/20260817091000_expense_invariants.up.sql"
+  - "migrations/20260817091000_expense_invariants.down.sql"
+
+  # Behavior tests (the golden cases / oracle) + BDD features.
+  - "tests/features/**"
+  - "tests/integrity_probes.rs"
+
+  # Hand-authored module documentation.
+  - "docs/**"
