@@ -1,6 +1,6 @@
 [package]
 name = "backbone-expenses"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 description = "Employee expense claims — categories, tax overlay, GL posting + reimbursement seams (pillar-people H-4)"
 
