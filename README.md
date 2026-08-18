@@ -26,6 +26,20 @@ General Ledger, one envelope per expense.
 | Approvals | `ApprovalFiling` (file + status, fail-closed TR2) | `UnwiredApprovals` | H-9 engine (P6); engine-side `expense` resource variant noted there |
 | Reimbursement | `ReimbursementSink` | `UnwiredReimbursement` (settle fails closed) | the finance wave over payment's `create_payment` |
 
+## Composition duties
+
+The module enforces its own invariants (row-truth state guards, payload-bound submit link,
+in-company category reads, balanced envelopes, TR2 fail-closed approvals). A composing service
+remains responsible for:
+
+- **employee_id validation** — a claim's `employee_id` is trusted to belong to the claim's
+  company; the host maps its authenticated actor to an in-company employee before calling.
+- **category-master authorization** — the guarded claim verbs are locked behind the module's
+  auth, but who may create/edit `expense_categories` (an operator surface) is the host's RBAC
+  decision.
+- **GL account validation** — `post_accounts` carries caller-supplied GL account ids; the host
+  adapter over accounting must resolve them against the company's own chart of accounts.
+
 ## Fence
 
 `company_fence: strict` from birth (ADR-0014) — all three tables carry company-isolation RLS.

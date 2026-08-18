@@ -1505,3 +1505,39 @@ async fn submit_retry_converges_same_request() {
     );
     assert!(!*racing.race_once.lock().unwrap());
 }
+
+// ─── EXP-24: the module-built service can be armed post-build (the compose path) ──
+
+#[tokio::test]
+async fn module_built_service_arms_approvals_after_build() {
+    let pool = pool().await;
+    let m = module(&pool).await;
+    let company = Uuid::new_v4();
+    let category = seed_category(&pool, company, "ARMD").await;
+    let t = token_for(company);
+    let request_id = Uuid::new_v4();
+
+    // The module was built unwired (family default); the composing app arms it afterwards —
+    // the exact sequence a service that composes this module performs at startup.
+    m.set_expenses_approvals(Arc::new(FakeApprovals {
+        verdict: ApprovalVerdict::Approved,
+    }));
+    let _ = request_id;
+
+    let app = create_guarded_expenses_routes(&m);
+    let (status, body) = create_claim(app.clone(), &t, company, category, Uuid::new_v4(), "12000").await;
+    assert_eq!(status, StatusCode::CREATED, "create: {body}");
+    let id = claim_id(&body);
+
+    assert_eq!(
+        req(app, "POST", &format!("/expenses/{id}/submit"), &t, String::new()).await,
+        StatusCode::OK
+    );
+    let linked: Option<String> = scoped_one(
+        &pool,
+        company,
+        format!("SELECT approval_request_id::text FROM expenses.expenses WHERE id = '{id}'"),
+    )
+    .await;
+    assert!(linked.is_some(), "armed-after-build port ⇒ submit links: {linked:?}");
+}

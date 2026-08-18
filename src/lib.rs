@@ -137,6 +137,21 @@ impl ExpensesModule {
     pub fn expenses_write_service(&self) -> Arc<ExpensesWriteService> {
         self.expenses_write_service.clone()
     }
+
+    /// Arm the approvals seam on the module-built service after the fact (last writer wins;
+    /// callers arm exactly once at composition time).
+    pub fn set_expenses_approvals(&self, port: Arc<dyn ApprovalFiling>) {
+        self.expenses_write_service.set_approvals(port);
+    }
+
+    /// Replace the write service at the composition root — how a host swaps in a service built
+    /// with real adapters over the fail-closed seams (GL posting, reimbursement) or its own
+    /// approvals port. Consuming `self` keeps the chain reading naturally; call before mounting
+    /// routes, the module is consumed once at startup.
+    pub fn with_expenses_write_service(mut self, svc: Arc<ExpensesWriteService>) -> Self {
+        self.expenses_write_service = svc;
+        self
+    }
     // END CUSTOM
 }
 
