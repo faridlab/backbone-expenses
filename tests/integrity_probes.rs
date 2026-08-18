@@ -1363,3 +1363,145 @@ async fn fence_write_leg_holds_for_non_superuser() {
 
     sqlx::query("RESET ROLE").execute(&mut *conn).await.unwrap();
 }
+
+// ─── EXP-22: a raced draft edit inside the file window never links a stale filing ──
+
+/// A port that mutates the draft out-of-band inside `file` — exactly the concurrent-edit
+/// window between the service's read and the compare-and-set link write. The id it returns
+/// is fixed so the orphan left behind is traceable (the convergence probe reuses the trick).
+struct RacingApprovals {
+    pool: PgPool,
+    company: Uuid,
+    expense_id: Uuid,
+    request_id: Uuid,
+    race_once: Mutex<bool>,
+}
+
+#[async_trait::async_trait]
+impl ApprovalFiling for RacingApprovals {
+    async fn file(
+        &self,
+        _req: &ExpenseApprovalFilingRequest,
+    ) -> Result<Uuid, ApprovalSeamError> {
+        let should_race = *self.race_once.lock().unwrap();
+        if should_race {
+            *self.race_once.lock().unwrap() = false;
+            company_scope::with_company_scope(Some(self.company), async {
+                sqlx::query("UPDATE expenses.expenses SET amount_total = amount_total + 1 WHERE id = $1")
+                    .bind(self.expense_id)
+                    .execute(&self.pool)
+                    .await
+                    .unwrap();
+            })
+            .await;
+        }
+        Ok(self.request_id)
+    }
+    async fn status(&self, _id: Uuid) -> Result<ApprovalVerdict, ApprovalSeamError> {
+        Ok(ApprovalVerdict::Approved)
+    }
+}
+
+#[tokio::test]
+async fn filing_payload_race_409s_and_does_not_link() {
+    let pool = pool().await;
+    let company = Uuid::new_v4();
+    let category = seed_category(&pool, company, "RACE").await;
+    let employee = Uuid::new_v4();
+
+    let svc = ExpensesWriteService::new(pool.clone());
+    let claim = svc
+        .create_expense(
+            company,
+            new_claim(category, employee, Decimal::new(50_000, 2), ExpensePaymentMode::OwnAccount),
+            None,
+        )
+        .await
+        .unwrap();
+
+    // The port edits the draft inside the file window: the filing describes the pre-edit
+    // amount, the row now carries post-edit values.
+    let svc = svc.with_approvals(Arc::new(RacingApprovals {
+        pool: pool.clone(),
+        company,
+        expense_id: claim.id,
+        request_id: Uuid::new_v4(),
+        race_once: Mutex::new(true),
+    }));
+    let err = svc
+        .submit_expense(company, claim.id, None, None)
+        .await
+        .unwrap_err();
+    assert_eq!(err.http_status(), 409, "raced payload ⇒ conflict: {err}");
+    assert_eq!(err.code(), "not_draft");
+
+    // The row was NEVER linked to the stale filing — still draft, no request id.
+    assert_eq!(
+        state_pair(&pool, company, claim.id).await,
+        ("draft".into(), "draft".into()),
+        "the row keeps its draft pair after the refused link"
+    );
+    let linked: Option<String> = scoped_one(
+        &pool,
+        company,
+        format!("SELECT approval_request_id::text FROM expenses.expenses WHERE id = '{}'", claim.id),
+    )
+    .await;
+    assert_eq!(linked, None, "no approval link on a raced-out submit");
+}
+
+// ─── EXP-23: the retry converges — same live request, now on the fresh row ─────
+
+#[tokio::test]
+async fn submit_retry_converges_same_request() {
+    let pool = pool().await;
+    let company = Uuid::new_v4();
+    let category = seed_category(&pool, company, "CNVG").await;
+    let employee = Uuid::new_v4();
+
+    let request_id = Uuid::new_v4(); // the engine's one live request for this resource
+    let svc = ExpensesWriteService::new(pool.clone());
+    let claim = svc
+        .create_expense(
+            company,
+            new_claim(category, employee, Decimal::new(75_000, 2), ExpensePaymentMode::OwnAccount),
+            None,
+        )
+        .await
+        .unwrap();
+
+    let racing = Arc::new(RacingApprovals {
+        pool: pool.clone(),
+        company,
+        expense_id: claim.id,
+        request_id,
+        race_once: Mutex::new(true),
+    });
+    let svc = svc.with_approvals(racing.clone());
+
+    // Attempt 1: the race 409s, leaving an orphaned-but-live filing in the engine.
+    assert_eq!(
+        svc.submit_expense(company, claim.id, None, None)
+            .await
+            .unwrap_err()
+            .http_status(),
+        409
+    );
+
+    // Attempt 2 (idempotent file ⇒ the same live request id): the CAS now matches the
+    // fresh row and the link lands on the SAME request the orphan was filed under.
+    let submitted = svc
+        .submit_expense(company, claim.id, None, None)
+        .await
+        .unwrap();
+    assert_eq!(
+        submitted.approval_request_id,
+        Some(request_id),
+        "retry links the one live request — no duplicate filing"
+    );
+    assert_eq!(
+        state_pair(&pool, company, claim.id).await,
+        ("submitted".into(), "submitted".into())
+    );
+    assert!(!*racing.race_once.lock().unwrap());
+}

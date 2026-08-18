@@ -184,6 +184,12 @@ impl ExpensesWriteRepository {
     }
 
     /// draft → submitted, stamping the approval link (None when the seam is unwired).
+    /// The guard matches not just the state pair but the
+    /// exact payload that was filed with the approvals engine: a concurrent draft edit
+    /// between the service's read and this write changes one of the filed fields, the
+    /// guard matches zero rows, and the caller surfaces the 409 — the row is never linked
+    /// to a filing whose snapshot no longer describes it. The client retries against the
+    /// fresh row and the engine's idempotent per-resource filing returns the same request.
     pub async fn mark_submitted(
         &self,
         conn: &mut sqlx::PgConnection,
@@ -192,6 +198,11 @@ impl ExpensesWriteRepository {
         approval_request_id: Option<Uuid>,
         actor: Option<Uuid>,
         now: DateTime<Utc>,
+        filed_employee: Uuid,
+        filed_category: Uuid,
+        filed_date: NaiveDate,
+        filed_amount: Decimal,
+        filed_currency: &str,
     ) -> Result<Option<Expense>, sqlx::Error> {
         sqlx::query_as::<_, Expense>(
             r#"UPDATE expenses.expenses SET
@@ -203,6 +214,8 @@ impl ExpensesWriteRepository {
                        'updated_at', to_jsonb($5::timestamptz))
                WHERE company_id = $1 AND id = $2
                  AND approval_state = 'draft' AND state = 'draft'
+                 AND employee_id = $6 AND category_id = $7
+                 AND expense_date = $8 AND amount_total = $9 AND currency = $10
                  AND (metadata->>'deleted_at') IS NULL
                RETURNING *"#,
         )
@@ -211,6 +224,11 @@ impl ExpensesWriteRepository {
         .bind(approval_request_id)
         .bind(actor)
         .bind(now)
+        .bind(filed_employee)
+        .bind(filed_category)
+        .bind(filed_date)
+        .bind(filed_amount)
+        .bind(filed_currency)
         .fetch_optional(&mut *conn)
         .await
     }

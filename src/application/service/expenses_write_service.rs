@@ -27,7 +27,7 @@
 use chrono::{DateTime, NaiveDate, Utc};
 use rust_decimal::Decimal;
 use sqlx::PgPool;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use uuid::Uuid;
 
 use backbone_orm::company_scope;
@@ -190,7 +190,7 @@ fn validate_currency(currency: &str) -> Result<(), ExpenseWriteError> {
 pub struct ExpensesWriteService {
     pool: PgPool,
     repo: ExpensesWriteRepository,
-    approvals: Arc<dyn ApprovalFiling>,
+    approvals: RwLock<Arc<dyn ApprovalFiling>>,
     gl_sink: Arc<dyn GlPostSink>,
     reimbursements: Arc<dyn ReimbursementSink>,
 }
@@ -200,16 +200,30 @@ impl ExpensesWriteService {
         Self {
             pool,
             repo: ExpensesWriteRepository,
-            approvals: Arc::new(UnwiredApprovals),
+            approvals: RwLock::new(Arc::new(UnwiredApprovals)),
             gl_sink: Arc::new(super::expense_gl::UnwiredGlSink),
             reimbursements: Arc::new(UnwiredReimbursement),
         }
     }
 
-    /// Wire the approvals seam (the app's adapter over backbone-approvals, H-9/P6).
+    /// Snapshot of the approvals seam for a single call. The seam is a RwLock so a service
+    /// the module already built (and handed to the router) can be re-armed by the composing
+    /// app after the fact — the consuming builder below only helps hosts that construct the
+    /// service themselves.
+    fn approvals(&self) -> Arc<dyn ApprovalFiling> {
+        self.approvals.read().expect("approvals seam lock").clone()
+    }
+
+    /// Wire the approvals seam BEFORE the service is handed anywhere (consuming builder).
     pub fn with_approvals(mut self, port: Arc<dyn ApprovalFiling>) -> Self {
-        self.approvals = port;
+        self.approvals = RwLock::new(port);
         self
+    }
+
+    /// Wire the approvals seam on a service the module already built and mounted. Idempotent:
+    /// the last writer wins; callers normally arm exactly once at composition time.
+    pub fn set_approvals(&self, port: Arc<dyn ApprovalFiling>) {
+        *self.approvals.write().expect("approvals seam lock") = port;
     }
 
     /// Wire the GL seam (the app's adapter over accounting's PostingService, W2).
@@ -309,10 +323,16 @@ impl ExpensesWriteService {
 
     // ─── lifecycle verbs ─────────────────────────────────────────────────────
 
-    /// Submit a draft for approval. FILE-FIRST, outside the tx (the timeoff P1 pattern: the
-    /// port call is a network hop and must not hold a row lock; an orphaned filing on a raced
-    /// insert is reaped by the engine's sweeper). Unwired seam ⇒ the claim simply carries no
-    /// link; a WIRED port that fails ⇒ the submit fails (no silently untracked claim).
+    /// Submit a draft for approval. FILE-FIRST, outside the tx (the timeoff pattern: the port
+    /// call is a network hop and must not hold a row lock). The link write is a compare-and-set
+    /// on the very payload that was filed: if the draft was edited concurrently between the
+    /// read and the write, the UPDATE matches zero rows and the caller gets a 409 — the row is
+    /// never linked to a filing whose snapshot no longer describes it. There is NO background
+    /// sweeper: a filing orphaned by such a race (or by a crash after `file` returns) simply
+    /// stays pending in the engine until the requester withdraws it; a retried submit files
+    /// idempotently (the engine returns the same live request for the resource) and converges
+    /// on the fresh row. Unwired seam ⇒ the claim simply carries no link; a WIRED port that
+    /// fails ⇒ the submit fails (no silently untracked claim).
     pub async fn submit_expense(
         &self,
         company: Uuid,
@@ -337,7 +357,7 @@ impl ExpensesWriteService {
             note,
             submitted_at: Utc::now(),
         };
-        let approval_request_id = match self.approvals.file(&filing).await {
+        let approval_request_id = match self.approvals().file(&filing).await {
             Ok(id) => Some(id),
             Err(ApprovalSeamError::Unwired) => None,
             Err(e) => return Err(e.into()),
@@ -347,7 +367,19 @@ impl ExpensesWriteService {
         company_scope::bind_company_on(&mut tx, company).await?;
         let submitted = self
             .repo
-            .mark_submitted(&mut tx, company, expense_id, approval_request_id, actor, Utc::now())
+            .mark_submitted(
+                &mut tx,
+                company,
+                expense_id,
+                approval_request_id,
+                actor,
+                Utc::now(),
+                filing.employee_id,
+                filing.category_id,
+                filing.expense_date,
+                filing.amount_total,
+                &filing.currency,
+            )
             .await?
             .ok_or(ExpenseWriteError::NotDraft)?;
         tx.commit().await?;
@@ -370,7 +402,7 @@ impl ExpensesWriteService {
             return Err(ExpenseWriteError::NotSubmitted);
         }
         if let Some(approval_request_id) = expense.approval_request_id {
-            match self.approvals.status(approval_request_id).await {
+            match self.approvals().status(approval_request_id).await {
                 Ok(ApprovalVerdict::Approved) => {}
                 Ok(_) => return Err(ExpenseWriteError::ApprovalNotGranted),
                 Err(ApprovalSeamError::Unwired)
