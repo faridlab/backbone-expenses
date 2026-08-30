@@ -17,16 +17,16 @@ path = "src/lib.rs"
 # or `rev = "<commit-sha>"`. Cargo dedupes the git fetch — the repo is only
 # cloned once even though four crates reference it.
 # -----------------------------------------------------------------------------
-backbone-core = { git = "https://github.com/faridlab/backbone-framework", tag = "v2.7.9", features = ["postgres"] }
-backbone-orm = { git = "https://github.com/faridlab/backbone-framework", tag = "v2.7.9" }
-backbone-auth = { git = "https://github.com/faridlab/backbone-framework", tag = "v2.7.9", features = ["axum"] }
-backbone-messaging = { git = "https://github.com/faridlab/backbone-framework", tag = "v2.7.9" }
+backbone-core = { git = "https://github.com/faridlab/backbone-framework", tag = "v2.7.11", features = ["postgres"] }
+backbone-orm = { git = "https://github.com/faridlab/backbone-framework", tag = "v2.7.11" }
+backbone-auth = { git = "https://github.com/faridlab/backbone-framework", tag = "v2.7.11", features = ["axum"] }
+backbone-messaging = { git = "https://github.com/faridlab/backbone-framework", tag = "v2.7.11" }
 # The shared GL-posting wire contract (shipped on backbone-framework v2.7.5+):
 # AccountingPostEnvelope / GlPostLine / GlPostAck / GlPostRejected / GlPostSink.
 # Expenses is a pure emitter (source_type = "expense"); the composing app
 # implements the sink over accounting's PostingService. Zero Cargo edge into
 # backbone-accounting (ADR-0004) — mirrors billing/payment_gl.rs.
-backbone-gl-posting = { git = "https://github.com/faridlab/backbone-framework", tag = "v2.7.9" }
+backbone-gl-posting = { git = "https://github.com/faridlab/backbone-framework", tag = "v2.7.11" }
 
 # Core async runtime and serialization
 tokio = { version = "1.0", features = ["full"] }
