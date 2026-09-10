@@ -33,9 +33,6 @@ use crate::domain::entity::AuditMetadata;
 #[cfg_attr(feature = "validation", derive(Validate))]
 #[serde(rename_all = "camelCase")]
 pub struct CreateExpenseCategoryDto {
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    #[serde(alias = "company_id")]
-    pub company_id: Uuid,
     #[cfg_attr(feature = "openapi", schema(example = "example"))]
     pub code: String,
     #[cfg_attr(feature = "openapi", schema(example = "example"))]
@@ -62,9 +59,6 @@ pub struct CreateExpenseCategoryDto {
 #[cfg_attr(feature = "validation", derive(Validate))]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateExpenseCategoryDto {
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    #[serde(alias = "company_id")]
-    pub company_id: Uuid,
     #[cfg_attr(feature = "openapi", schema(example = "example"))]
     pub code: String,
     #[cfg_attr(feature = "openapi", schema(example = "example"))]
@@ -91,9 +85,6 @@ pub struct UpdateExpenseCategoryDto {
 #[cfg_attr(feature = "validation", derive(Validate))]
 #[serde(rename_all = "camelCase")]
 pub struct PatchExpenseCategoryDto {
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    #[serde(skip_serializing_if = "Option::is_none", alias = "company_id")]
-    pub company_id: Option<Uuid>,
     #[cfg_attr(feature = "openapi", schema(example = "example"))]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub code: Option<String>,
@@ -112,7 +103,7 @@ pub struct PatchExpenseCategoryDto {
 impl PatchExpenseCategoryDto {
     /// Check if any field is set
     pub fn has_changes(&self) -> bool {
-        self.company_id.is_some() || self.code.is_some() || self.name.is_some() || self.expense_account_id.is_some() || self.default_tax_rate.is_some() || self.description.is_some()
+        self.code.is_some() || self.name.is_some() || self.expense_account_id.is_some() || self.default_tax_rate.is_some() || self.description.is_some()
     }
 }
 
@@ -130,8 +121,6 @@ impl PatchExpenseCategoryDto {
 pub struct ExpenseCategoryResponseDto {
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     pub id: Uuid,
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    pub company_id: Uuid,
     #[cfg_attr(feature = "openapi", schema(example = "example"))]
     pub code: String,
     #[cfg_attr(feature = "openapi", schema(example = "example"))]
@@ -197,9 +186,9 @@ impl ExpenseCategoryListResponseDto {
 #[serde(rename_all = "camelCase")]
 pub struct ExpenseCategorySummaryDto {
     pub id: Uuid,
-    pub company_id: Uuid,
     pub code: String,
     pub name: String,
+    pub expense_account_id: Uuid,
     pub created_at: Option<DateTime<Utc>>,
 }
 
@@ -211,7 +200,6 @@ impl From<ExpenseCategory> for ExpenseCategoryResponseDto {
     fn from(entity: ExpenseCategory) -> Self {
         Self {
             id: entity.id,
-            company_id: entity.company_id,
             code: entity.code,
             name: entity.name,
             expense_account_id: entity.expense_account_id,
@@ -227,9 +215,9 @@ impl From<ExpenseCategory> for ExpenseCategorySummaryDto {
         let created_at = backbone_core::PersistentEntity::created_at(&entity);
         Self {
             id: entity.id,
-            company_id: entity.company_id,
             code: entity.code,
             name: entity.name,
+            expense_account_id: entity.expense_account_id,
             created_at,
         }
     }
@@ -239,7 +227,6 @@ impl From<CreateExpenseCategoryDto> for ExpenseCategory {
     fn from(dto: CreateExpenseCategoryDto) -> Self {
         Self {
             id: Uuid::new_v4(),
-            company_id: dto.company_id,
             code: dto.code,
             name: dto.name,
             expense_account_id: dto.expense_account_id,
@@ -254,7 +241,6 @@ impl From<&ExpenseCategory> for ExpenseCategoryResponseDto {
     fn from(entity: &ExpenseCategory) -> Self {
         Self {
             id: entity.id.clone(),
-            company_id: entity.company_id.clone(),
             code: entity.code.clone(),
             name: entity.name.clone(),
             expense_account_id: entity.expense_account_id.clone(),
@@ -273,7 +259,6 @@ impl backbone_core::FromCreateDto<CreateExpenseCategoryDto> for ExpenseCategory 
 
 impl backbone_core::ApplyUpdateDto<UpdateExpenseCategoryDto> for ExpenseCategory {
     fn apply_update(mut self, dto: UpdateExpenseCategoryDto) -> backbone_core::ServiceResult<Self> {
-        self.company_id = dto.company_id;
         self.code = dto.code;
         self.name = dto.name;
         self.expense_account_id = dto.expense_account_id;
@@ -291,4 +276,3 @@ impl backbone_core::ApplyUpdateDto<UpdateExpenseCategoryDto> for ExpenseCategory
 // Add custom DTOs specific to ExpenseCategory here.
 // This section will be preserved during regeneration.
 // >>> END CUSTOM DTOs
-

@@ -53,7 +53,6 @@ impl std::ops::Deref for ExpenseId {
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Expense {
     pub id: Uuid,
-    pub company_id: Uuid,
     pub employee_id: Uuid,
     pub category_id: Uuid,
     pub expense_date: NaiveDate,
@@ -81,10 +80,9 @@ impl Expense {
     }
 
     /// Create a new Expense with required fields
-    pub fn new(company_id: Uuid, employee_id: Uuid, category_id: Uuid, expense_date: NaiveDate, description: String, amount_total: Decimal, currency: String, payment_mode: ExpensePaymentMode, approval_state: ExpenseApprovalState, state: ExpenseState) -> Self {
+    pub fn new(employee_id: Uuid, category_id: Uuid, expense_date: NaiveDate, description: String, amount_total: Decimal, currency: String, payment_mode: ExpensePaymentMode, approval_state: ExpenseApprovalState, state: ExpenseState) -> Self {
         Self {
             id: Uuid::new_v4(),
-            company_id,
             employee_id,
             category_id,
             expense_date,
@@ -203,9 +201,6 @@ impl Expense {
     pub fn apply_patch(&mut self, fields: std::collections::HashMap<String, serde_json::Value>) {
         for (key, value) in fields {
             match key.as_str() {
-                "company_id" => {
-                    if let Ok(v) = serde_json::from_value(value) { self.company_id = v; }
-                }
                 "employee_id" => {
                     if let Ok(v) = serde_json::from_value(value) { self.employee_id = v; }
                 }
@@ -305,7 +300,6 @@ impl backbone_orm::EntityRepoMeta for Expense {
     fn column_types() -> std::collections::HashMap<String, String> {
         let mut m = std::collections::HashMap::new();
         m.insert("id".to_string(), "uuid".to_string());
-        m.insert("company_id".to_string(), "uuid".to_string());
         m.insert("employee_id".to_string(), "uuid".to_string());
         m.insert("category_id".to_string(), "uuid".to_string());
         m.insert("approval_request_id".to_string(), "uuid".to_string());
@@ -321,9 +315,6 @@ impl backbone_orm::EntityRepoMeta for Expense {
     fn search_fields() -> &'static [&'static str] {
         &["description", "currency"]
     }
-    fn company_field() -> Option<&'static str> {
-        Some("company_id")
-    }
 }
 
 /// Builder for Expense entity
@@ -332,7 +323,6 @@ impl backbone_orm::EntityRepoMeta for Expense {
 /// System fields (id, metadata, timestamps) are auto-initialized.
 #[derive(Debug, Clone, Default)]
 pub struct ExpenseBuilder {
-    company_id: Option<Uuid>,
     employee_id: Option<Uuid>,
     category_id: Option<Uuid>,
     expense_date: Option<NaiveDate>,
@@ -351,12 +341,6 @@ pub struct ExpenseBuilder {
 }
 
 impl ExpenseBuilder {
-    /// Set the company_id field (required)
-    pub fn company_id(mut self, value: Uuid) -> Self {
-        self.company_id = Some(value);
-        self
-    }
-
     /// Set the employee_id field (required)
     pub fn employee_id(mut self, value: Uuid) -> Self {
         self.employee_id = Some(value);
@@ -451,7 +435,6 @@ impl ExpenseBuilder {
     ///
     /// Returns Err if any required field without a default is missing.
     pub fn build(self) -> Result<Expense, String> {
-        let company_id = self.company_id.ok_or_else(|| "company_id is required".to_string())?;
         let employee_id = self.employee_id.ok_or_else(|| "employee_id is required".to_string())?;
         let category_id = self.category_id.ok_or_else(|| "category_id is required".to_string())?;
         let expense_date = self.expense_date.ok_or_else(|| "expense_date is required".to_string())?;
@@ -463,7 +446,6 @@ impl ExpenseBuilder {
 
         Ok(Expense {
             id: Uuid::new_v4(),
-            company_id,
             employee_id,
             category_id,
             expense_date,

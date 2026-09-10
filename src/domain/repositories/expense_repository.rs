@@ -44,7 +44,6 @@ pub struct ExpensePaginatedResult {
 /// Filter parameters for list queries
 #[derive(Debug, Clone, Default)]
 pub struct ExpenseFilter {
-    pub company_id: Option<Uuid>,
     pub employee_id: Option<Uuid>,
     pub category_id: Option<Uuid>,
     pub description: Option<String>,
@@ -63,7 +62,7 @@ pub struct ExpenseFilter {
 impl ExpenseFilter {
     /// Check if any filter is set
     pub fn has_filters(&self) -> bool {
-        self.company_id.is_some() || self.employee_id.is_some() || self.category_id.is_some() || self.description.is_some() || self.currency.is_some() || self.payment_mode.is_some() || self.reference.is_some() || self.approval_state.is_some() || self.state.is_some() || self.approval_request_id.is_some() || self.journal_id.is_some() || self.accounting_post_id.is_some() || self.reimbursement_id.is_some() || self.receipt_file_id.is_some()
+        self.employee_id.is_some() || self.category_id.is_some() || self.description.is_some() || self.currency.is_some() || self.payment_mode.is_some() || self.reference.is_some() || self.approval_state.is_some() || self.state.is_some() || self.approval_request_id.is_some() || self.journal_id.is_some() || self.accounting_post_id.is_some() || self.reimbursement_id.is_some() || self.receipt_file_id.is_some()
     }
 }
 

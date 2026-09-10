@@ -1,17 +1,17 @@
 # =============================================================================
 # Domain: expenses
 # Entity: ExpenseCategory
-# Description: A company-defined expense classification carrying the GL
-#              expense account posts hit (Odoo models this via expensable
-#              products + product-category accounts; the locked W1 decision
-#              is a lighter own entity so People does not couple to the
-#              catalog module before the finance wave composes it).
+# Description: An expense classification carrying the GL expense account
+#              posts hit (Odoo models this via expensable products +
+#              product-category accounts; the locked W1 decision is a
+#              lighter own entity so People does not couple to the catalog
+#              module before the finance wave composes it).
 # =============================================================================
 
 models:
   - name: ExpenseCategory
     collection: expense_categories
-    description: "Company expense classification with its GL expense account (per-category accounts)."
+    description: "Expense classification with its GL expense account (per-category accounts)."
 
     fields:
       id:
@@ -19,15 +19,10 @@ models:
         attributes: ["@id", "@default(uuid)"]
         description: "Unique record id"
 
-      company_id:
-        type: uuid
-        attributes: ["@required", "@exclude_from_foreign_key_check"]
-        description: "Org owner # logical FK organization.Company.id"
-
       code:
         type: string
         attributes: ["@required", "@length(max=64)"]
-        description: "Short stable code (e.g. TRAVEL, MEAL) — unique per company"
+        description: "Short stable code (e.g. TRAVEL, MEAL) — unique per org unit among live rows; the per-unit unique is the composing service's tenancy decorator"
 
       name:
         type: string
@@ -53,7 +48,7 @@ models:
         description: "Audit metadata"
 
     indexes:
-      - type: unique
-        fields: [company_id, code]
-        where: "deleted_at IS NULL"
-        description: "One live category per code per company"
+      # No tenancy indexes (ADR-0029): the module is tenant-agnostic. The per-unit
+      # code unique — one live category per code per org unit — is installed by
+      # the composing service's tenancy decorator (org_unit_id-leading), not
+      # declared here.

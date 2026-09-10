@@ -38,8 +38,8 @@ pub use application::service::ExpenseTaxLineService;
 
 // <<< CUSTOM
 // The validated write path (H-4), its seam ports (approvals / GL / reimbursement — all
-// default-unwired, fail-closed), the guarded HTTP composition, and `company_scope` re-exported
-// for the RLS probe suite (tests see only the public surface — party/attendance convention).
+// default-unwired, fail-closed), the guarded HTTP composition, and `org_scope` re-exported
+// for the tenancy probe suite (tests see only the public surface — party/attendance convention).
 pub use application::service::{
     build_expense_envelope, AccountingPostEnvelope, ApprovalFiling, ApprovalSeamError,
     ApprovalVerdict, EnvelopeError, ExpenseApprovalFilingRequest, ExpenseWriteError,
@@ -48,7 +48,7 @@ pub use application::service::{
     ReimbursementSink, TaxLineInput, UnwiredApprovals, UnwiredGlSink, UnwiredReimbursement,
 };
 pub use presentation::http::create_guarded_expenses_routes;
-pub use backbone_orm::company_scope;
+pub use backbone_orm::org_scope;
 // END CUSTOM
 
 use std::sync::Arc;

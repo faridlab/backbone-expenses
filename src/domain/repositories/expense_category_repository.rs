@@ -44,7 +44,6 @@ pub struct ExpenseCategoryPaginatedResult {
 /// Filter parameters for list queries
 #[derive(Debug, Clone, Default)]
 pub struct ExpenseCategoryFilter {
-    pub company_id: Option<Uuid>,
     pub code: Option<String>,
     pub name: Option<String>,
     pub expense_account_id: Option<Uuid>,
@@ -54,7 +53,7 @@ pub struct ExpenseCategoryFilter {
 impl ExpenseCategoryFilter {
     /// Check if any filter is set
     pub fn has_filters(&self) -> bool {
-        self.company_id.is_some() || self.code.is_some() || self.name.is_some() || self.expense_account_id.is_some() || self.description.is_some()
+        self.code.is_some() || self.name.is_some() || self.expense_account_id.is_some() || self.description.is_some()
     }
 }
 

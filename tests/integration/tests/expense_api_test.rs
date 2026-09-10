@@ -24,7 +24,6 @@ impl TestDataGenerator for ExpenseTestData {
         let now = Utc::now().to_rfc3339();
         json!({
             "id": Uuid::new_v4().to_string(),
-            "company_id": Uuid::new_v4().to_string(),
             "employee_id": Uuid::new_v4().to_string(),
             "category_id": Uuid::new_v4().to_string(),
             "expense_date": Utc::now().format("%Y-%m-%d").to_string(),
@@ -48,7 +47,6 @@ impl TestDataGenerator for ExpenseTestData {
         let now = Utc::now().to_rfc3339();
         json!({
             "id": id,
-            "company_id": Uuid::new_v4().to_string(),
             "employee_id": Uuid::new_v4().to_string(),
             "category_id": Uuid::new_v4().to_string(),
             "expense_date": Utc::now().format("%Y-%m-%d").to_string(),

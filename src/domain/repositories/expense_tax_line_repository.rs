@@ -44,7 +44,6 @@ pub struct ExpenseTaxLinePaginatedResult {
 /// Filter parameters for list queries
 #[derive(Debug, Clone, Default)]
 pub struct ExpenseTaxLineFilter {
-    pub company_id: Option<Uuid>,
     pub expense_id: Option<Uuid>,
     pub basis: Option<String>,
     pub account_id: Option<Uuid>,
@@ -54,7 +53,7 @@ pub struct ExpenseTaxLineFilter {
 impl ExpenseTaxLineFilter {
     /// Check if any filter is set
     pub fn has_filters(&self) -> bool {
-        self.company_id.is_some() || self.expense_id.is_some() || self.basis.is_some() || self.account_id.is_some() || self.description.is_some()
+        self.expense_id.is_some() || self.basis.is_some() || self.account_id.is_some() || self.description.is_some()
     }
 }
 

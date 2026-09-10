@@ -49,7 +49,6 @@ impl std::ops::Deref for ExpenseTaxLineId {
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct ExpenseTaxLine {
     pub id: Uuid,
-    pub company_id: Uuid,
     pub expense_id: Uuid,
     pub basis: String,
     pub account_id: Uuid,
@@ -68,10 +67,9 @@ impl ExpenseTaxLine {
     }
 
     /// Create a new ExpenseTaxLine with required fields
-    pub fn new(company_id: Uuid, expense_id: Uuid, basis: String, account_id: Uuid, rate: Decimal, tax_amount: Decimal) -> Self {
+    pub fn new(expense_id: Uuid, basis: String, account_id: Uuid, rate: Decimal, tax_amount: Decimal) -> Self {
         Self {
             id: Uuid::new_v4(),
-            company_id,
             expense_id,
             basis,
             account_id,
@@ -151,9 +149,6 @@ impl ExpenseTaxLine {
     pub fn apply_patch(&mut self, fields: std::collections::HashMap<String, serde_json::Value>) {
         for (key, value) in fields {
             match key.as_str() {
-                "company_id" => {
-                    if let Ok(v) = serde_json::from_value(value) { self.company_id = v; }
-                }
                 "expense_id" => {
                     if let Ok(v) = serde_json::from_value(value) { self.expense_id = v; }
                 }
@@ -226,16 +221,12 @@ impl backbone_orm::EntityRepoMeta for ExpenseTaxLine {
     fn column_types() -> std::collections::HashMap<String, String> {
         let mut m = std::collections::HashMap::new();
         m.insert("id".to_string(), "uuid".to_string());
-        m.insert("company_id".to_string(), "uuid".to_string());
         m.insert("expense_id".to_string(), "uuid".to_string());
         m.insert("account_id".to_string(), "uuid".to_string());
         m
     }
     fn search_fields() -> &'static [&'static str] {
         &["basis"]
-    }
-    fn company_field() -> Option<&'static str> {
-        Some("company_id")
     }
 }
 
@@ -245,7 +236,6 @@ impl backbone_orm::EntityRepoMeta for ExpenseTaxLine {
 /// System fields (id, metadata, timestamps) are auto-initialized.
 #[derive(Debug, Clone, Default)]
 pub struct ExpenseTaxLineBuilder {
-    company_id: Option<Uuid>,
     expense_id: Option<Uuid>,
     basis: Option<String>,
     account_id: Option<Uuid>,
@@ -255,12 +245,6 @@ pub struct ExpenseTaxLineBuilder {
 }
 
 impl ExpenseTaxLineBuilder {
-    /// Set the company_id field (required)
-    pub fn company_id(mut self, value: Uuid) -> Self {
-        self.company_id = Some(value);
-        self
-    }
-
     /// Set the expense_id field (required)
     pub fn expense_id(mut self, value: Uuid) -> Self {
         self.expense_id = Some(value);
@@ -301,7 +285,6 @@ impl ExpenseTaxLineBuilder {
     ///
     /// Returns Err if any required field without a default is missing.
     pub fn build(self) -> Result<ExpenseTaxLine, String> {
-        let company_id = self.company_id.ok_or_else(|| "company_id is required".to_string())?;
         let expense_id = self.expense_id.ok_or_else(|| "expense_id is required".to_string())?;
         let basis = self.basis.ok_or_else(|| "basis is required".to_string())?;
         let account_id = self.account_id.ok_or_else(|| "account_id is required".to_string())?;
@@ -310,7 +293,6 @@ impl ExpenseTaxLineBuilder {
 
         Ok(ExpenseTaxLine {
             id: Uuid::new_v4(),
-            company_id,
             expense_id,
             basis,
             account_id,

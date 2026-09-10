@@ -17,7 +17,10 @@ use uuid::Uuid;
 /// to the GL, now due to the employee.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReimbursementRequest {
-    /// The company scope (stamped onto the payment for its own fence).
+    /// The legacy tenancy twin (ADR-0029): expenses itself is tenant-agnostic, but the
+    /// receiving payment books still key on one (stamped onto the payment for its own
+    /// fence). The write service sources it from the ambient org scope's legacy company
+    /// id and fails closed when no scope is bound — it never guesses.
     pub company_id: Uuid,
     /// The posted expense the payment settles (correlation id).
     pub expense_id: Uuid,

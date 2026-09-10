@@ -15,6 +15,8 @@
 # =============================================================================
 
 models:
+  # Tenancy: none, by design (ADR-0029). Tenant-agnostic and reusable; a composing
+  # service's tenancy decorator owns org scoping for all three tables in this module.
   - name: Expense
     collection: expenses
     description: "An employee expense claim (per-category account, dual payment mode, two-field lifecycle)."
@@ -24,11 +26,6 @@ models:
         type: uuid
         attributes: ["@id", "@default(uuid)"]
         description: "Unique record id"
-
-      company_id:
-        type: uuid
-        attributes: ["@required", "@exclude_from_foreign_key_check"]
-        description: "Org owner # logical FK organization.Company.id"
 
       employee_id:
         type: uuid
@@ -108,12 +105,16 @@ models:
         description: "Audit metadata"
 
     indexes:
+      # No tenancy indexes (ADR-0029): the module is tenant-agnostic. The
+      # org_unit_id-leading report and queue indexes are installed by the
+      # composing service's tenancy decorator, not declared here. The
+      # employee and lifecycle listings are domain, tenant-free, and stay.
       - type: index
-        fields: [company_id, employee_id, expense_date]
+        fields: [employee_id, expense_date]
         description: "Report projection: group by employee over a date range"
       - type: index
-        fields: [company_id, state]
-        description: "Workflow queues: pending approvals / to-post / to-settle per company"
+        fields: [state]
+        description: "Workflow queues: pending approvals / to-post / to-settle"
 
 enums:
   - name: ExpensePaymentMode

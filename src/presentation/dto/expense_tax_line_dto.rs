@@ -34,9 +34,6 @@ use crate::domain::entity::AuditMetadata;
 #[serde(rename_all = "camelCase")]
 pub struct CreateExpenseTaxLineDto {
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    #[serde(alias = "company_id")]
-    pub company_id: Uuid,
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     #[serde(alias = "expense_id")]
     pub expense_id: Uuid,
     #[cfg_attr(feature = "openapi", schema(example = "example"))]
@@ -64,9 +61,6 @@ pub struct CreateExpenseTaxLineDto {
 #[cfg_attr(feature = "validation", derive(Validate))]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateExpenseTaxLineDto {
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    #[serde(alias = "company_id")]
-    pub company_id: Uuid,
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     #[serde(alias = "expense_id")]
     pub expense_id: Uuid,
@@ -96,9 +90,6 @@ pub struct UpdateExpenseTaxLineDto {
 #[serde(rename_all = "camelCase")]
 pub struct PatchExpenseTaxLineDto {
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    #[serde(skip_serializing_if = "Option::is_none", alias = "company_id")]
-    pub company_id: Option<Uuid>,
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     #[serde(skip_serializing_if = "Option::is_none", alias = "expense_id")]
     pub expense_id: Option<Uuid>,
     #[cfg_attr(feature = "openapi", schema(example = "example"))]
@@ -118,7 +109,7 @@ pub struct PatchExpenseTaxLineDto {
 impl PatchExpenseTaxLineDto {
     /// Check if any field is set
     pub fn has_changes(&self) -> bool {
-        self.company_id.is_some() || self.expense_id.is_some() || self.basis.is_some() || self.account_id.is_some() || self.description.is_some() || self.rate.is_some() || self.tax_amount.is_some()
+        self.expense_id.is_some() || self.basis.is_some() || self.account_id.is_some() || self.description.is_some() || self.rate.is_some() || self.tax_amount.is_some()
     }
 }
 
@@ -136,8 +127,6 @@ impl PatchExpenseTaxLineDto {
 pub struct ExpenseTaxLineResponseDto {
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     pub id: Uuid,
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    pub company_id: Uuid,
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     pub expense_id: Uuid,
     #[cfg_attr(feature = "openapi", schema(example = "example"))]
@@ -204,9 +193,9 @@ impl ExpenseTaxLineListResponseDto {
 #[serde(rename_all = "camelCase")]
 pub struct ExpenseTaxLineSummaryDto {
     pub id: Uuid,
-    pub company_id: Uuid,
     pub expense_id: Uuid,
     pub basis: String,
+    pub account_id: Uuid,
     pub created_at: Option<DateTime<Utc>>,
 }
 
@@ -218,7 +207,6 @@ impl From<ExpenseTaxLine> for ExpenseTaxLineResponseDto {
     fn from(entity: ExpenseTaxLine) -> Self {
         Self {
             id: entity.id,
-            company_id: entity.company_id,
             expense_id: entity.expense_id,
             basis: entity.basis,
             account_id: entity.account_id,
@@ -235,9 +223,9 @@ impl From<ExpenseTaxLine> for ExpenseTaxLineSummaryDto {
         let created_at = backbone_core::PersistentEntity::created_at(&entity);
         Self {
             id: entity.id,
-            company_id: entity.company_id,
             expense_id: entity.expense_id,
             basis: entity.basis,
+            account_id: entity.account_id,
             created_at,
         }
     }
@@ -247,7 +235,6 @@ impl From<CreateExpenseTaxLineDto> for ExpenseTaxLine {
     fn from(dto: CreateExpenseTaxLineDto) -> Self {
         Self {
             id: Uuid::new_v4(),
-            company_id: dto.company_id,
             expense_id: dto.expense_id,
             basis: dto.basis,
             account_id: dto.account_id,
@@ -263,7 +250,6 @@ impl From<&ExpenseTaxLine> for ExpenseTaxLineResponseDto {
     fn from(entity: &ExpenseTaxLine) -> Self {
         Self {
             id: entity.id.clone(),
-            company_id: entity.company_id.clone(),
             expense_id: entity.expense_id.clone(),
             basis: entity.basis.clone(),
             account_id: entity.account_id.clone(),
@@ -283,7 +269,6 @@ impl backbone_core::FromCreateDto<CreateExpenseTaxLineDto> for ExpenseTaxLine {
 
 impl backbone_core::ApplyUpdateDto<UpdateExpenseTaxLineDto> for ExpenseTaxLine {
     fn apply_update(mut self, dto: UpdateExpenseTaxLineDto) -> backbone_core::ServiceResult<Self> {
-        self.company_id = dto.company_id;
         self.expense_id = dto.expense_id;
         self.basis = dto.basis;
         self.account_id = dto.account_id;
@@ -302,4 +287,3 @@ impl backbone_core::ApplyUpdateDto<UpdateExpenseTaxLineDto> for ExpenseTaxLine {
 // Add custom DTOs specific to ExpenseTaxLine here.
 // This section will be preserved during regeneration.
 // >>> END CUSTOM DTOs
-

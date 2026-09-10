@@ -36,7 +36,10 @@ pub enum ApprovalVerdict {
 /// back-reference so the engine's notifications link back to the claim.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExpenseApprovalFilingRequest {
-    /// The company scope (stamped onto the ApprovalRequest for its own fence).
+    /// The legacy tenancy twin (ADR-0029): expenses itself is tenant-agnostic, but the
+    /// receiving approvals engine still keys on one (stamped onto the ApprovalRequest
+    /// for its own fence). The write service sources it from the ambient org scope's
+    /// legacy company id and fails closed when no scope is bound — it never guesses.
     pub company_id: Uuid,
     /// The expense claim the filing is about (correlation id).
     pub expense_id: Uuid,

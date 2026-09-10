@@ -186,4 +186,3 @@ pub fn create_protected_expense_tax_line_routes<A: AuthMiddleware + Send + Sync 
             }
         }))
 }
-

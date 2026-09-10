@@ -37,9 +37,6 @@ use crate::domain::entity::ExpenseState;
 #[serde(rename_all = "camelCase")]
 pub struct CreateExpenseDto {
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    #[serde(alias = "company_id")]
-    pub company_id: Uuid,
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     #[serde(alias = "employee_id")]
     pub employee_id: Uuid,
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
@@ -87,9 +84,6 @@ pub struct CreateExpenseDto {
 #[cfg_attr(feature = "validation", derive(Validate))]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateExpenseDto {
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    #[serde(alias = "company_id")]
-    pub company_id: Uuid,
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     #[serde(alias = "employee_id")]
     pub employee_id: Uuid,
@@ -139,9 +133,6 @@ pub struct UpdateExpenseDto {
 #[serde(rename_all = "camelCase")]
 pub struct PatchExpenseDto {
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    #[serde(skip_serializing_if = "Option::is_none", alias = "company_id")]
-    pub company_id: Option<Uuid>,
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     #[serde(skip_serializing_if = "Option::is_none", alias = "employee_id")]
     pub employee_id: Option<Uuid>,
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
@@ -182,7 +173,7 @@ pub struct PatchExpenseDto {
 impl PatchExpenseDto {
     /// Check if any field is set
     pub fn has_changes(&self) -> bool {
-        self.company_id.is_some() || self.employee_id.is_some() || self.category_id.is_some() || self.expense_date.is_some() || self.description.is_some() || self.amount_total.is_some() || self.currency.is_some() || self.payment_mode.is_some() || self.reference.is_some() || self.approval_state.is_some() || self.state.is_some() || self.approval_request_id.is_some() || self.journal_id.is_some() || self.accounting_post_id.is_some() || self.reimbursement_id.is_some() || self.receipt_file_id.is_some()
+        self.employee_id.is_some() || self.category_id.is_some() || self.expense_date.is_some() || self.description.is_some() || self.amount_total.is_some() || self.currency.is_some() || self.payment_mode.is_some() || self.reference.is_some() || self.approval_state.is_some() || self.state.is_some() || self.approval_request_id.is_some() || self.journal_id.is_some() || self.accounting_post_id.is_some() || self.reimbursement_id.is_some() || self.receipt_file_id.is_some()
     }
 }
 
@@ -200,8 +191,6 @@ impl PatchExpenseDto {
 pub struct ExpenseResponseDto {
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     pub id: Uuid,
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    pub company_id: Uuid,
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     pub employee_id: Uuid,
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
@@ -279,9 +268,9 @@ impl ExpenseListResponseDto {
 #[serde(rename_all = "camelCase")]
 pub struct ExpenseSummaryDto {
     pub id: Uuid,
-    pub company_id: Uuid,
     pub employee_id: Uuid,
     pub category_id: Uuid,
+    pub expense_date: NaiveDate,
     pub created_at: Option<DateTime<Utc>>,
 }
 
@@ -293,7 +282,6 @@ impl From<Expense> for ExpenseResponseDto {
     fn from(entity: Expense) -> Self {
         Self {
             id: entity.id,
-            company_id: entity.company_id,
             employee_id: entity.employee_id,
             category_id: entity.category_id,
             expense_date: entity.expense_date,
@@ -319,9 +307,9 @@ impl From<Expense> for ExpenseSummaryDto {
         let created_at = backbone_core::PersistentEntity::created_at(&entity);
         Self {
             id: entity.id,
-            company_id: entity.company_id,
             employee_id: entity.employee_id,
             category_id: entity.category_id,
+            expense_date: entity.expense_date,
             created_at,
         }
     }
@@ -331,7 +319,6 @@ impl From<CreateExpenseDto> for Expense {
     fn from(dto: CreateExpenseDto) -> Self {
         Self {
             id: Uuid::new_v4(),
-            company_id: dto.company_id,
             employee_id: dto.employee_id,
             category_id: dto.category_id,
             expense_date: dto.expense_date,
@@ -356,7 +343,6 @@ impl From<&Expense> for ExpenseResponseDto {
     fn from(entity: &Expense) -> Self {
         Self {
             id: entity.id.clone(),
-            company_id: entity.company_id.clone(),
             employee_id: entity.employee_id.clone(),
             category_id: entity.category_id.clone(),
             expense_date: entity.expense_date.clone(),
@@ -385,7 +371,6 @@ impl backbone_core::FromCreateDto<CreateExpenseDto> for Expense {
 
 impl backbone_core::ApplyUpdateDto<UpdateExpenseDto> for Expense {
     fn apply_update(mut self, dto: UpdateExpenseDto) -> backbone_core::ServiceResult<Self> {
-        self.company_id = dto.company_id;
         self.employee_id = dto.employee_id;
         self.category_id = dto.category_id;
         self.expense_date = dto.expense_date;
@@ -413,4 +398,3 @@ impl backbone_core::ApplyUpdateDto<UpdateExpenseDto> for Expense {
 // Add custom DTOs specific to Expense here.
 // This section will be preserved during regeneration.
 // >>> END CUSTOM DTOs
-

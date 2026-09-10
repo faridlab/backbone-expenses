@@ -19,11 +19,6 @@ models:
         attributes: ["@id", "@default(uuid)"]
         description: "Unique record id"
 
-      company_id:
-        type: uuid
-        attributes: ["@required", "@exclude_from_foreign_key_check"]
-        description: "Org owner # logical FK organization.Company.id"
-
       expense_id:
         type: uuid
         attributes: ["@required", "@exclude_from_foreign_key_check"]

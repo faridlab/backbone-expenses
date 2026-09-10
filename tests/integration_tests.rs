@@ -51,4 +51,3 @@ async fn test_expense_tax_line_api() {
         panic!("{} tests failed", failed.len());
     }
 }
-

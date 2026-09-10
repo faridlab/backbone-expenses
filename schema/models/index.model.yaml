@@ -12,10 +12,11 @@
 module: expenses
 version: 2
 schema: expenses
-
-# ADR-0014 company fence (declared at birth, W1 P3): expense claims, their
-# categories and tax overlay rows are company-private (pillar-people H-4).
-company_fence: strict
+# Tenancy: none, by design (ADR-0029). The module is tenant-agnostic and reusable —
+# it ships no scoping column and no fence declaration. A composing backend-service
+# that wants these tables org-scoped declares them in its tenancy.yaml; the
+# decorator installs org_unit_id, the RLS policy, and per-unit uniques at
+# composition time.
 description: "employee expense claims — categories, tax overlay, GL posting + reimbursement seams"
 
 config:

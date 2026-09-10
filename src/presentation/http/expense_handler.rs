@@ -187,4 +187,3 @@ pub fn create_protected_expense_routes<A: AuthMiddleware + Send + Sync + 'static
             }
         }))
 }
-

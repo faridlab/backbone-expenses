@@ -13,17 +13,15 @@
 //!   two-field lifecycle (ADR-0016), the row-truth state guards, the TR2 fail-closed approve,
 //!   and the three seams (approvals / GL / reimbursement — all default-unwired, all fail closed).
 //!
-//! The tenant comes from the [`CompanyContext`] the `company_auth` middleware inserts — never
+//! The acting principal comes from the [`OrgContext`] the composing service's org auth
+//! middleware inserts (route gating + actor stamping only — never a query predicate) — never
 //! from the body. `postAccounts` on the POST body is the W1 stopgap: accounting (W2) will supply
 //! the payable/bank accounts at composition time instead of the caller.
 //!
-//! **Fence posture** (ADR-0008): the generated GET read routes and the category CRUD carry no
-//! company predicate in SQL — their row visibility is the DB fence (strict RLS, `app.company_id`
-//! request binding), exactly like the family's other guarded compositions. Composers MUST mount
-//! this behind `company_auth` with the request-scoped DB binding (the serpa posture), where a
-//! cross-tenant id simply matches zero rows. Every verb's SQL additionally carries its own
-//! company predicate (belt-and-braces), so the write path 404s cross-tenant even on an unfenced
-//! connection — pinned by tests/integrity_probes.rs.
+//! Tenancy: none, by design (ADR-0029). No handler threads a tenant key — the services relay
+//! the ambient request org scope onto their transactions, and the composing decorator's
+//! row-level fences decide which rows a caller can see and write. Unfenced deployments get an
+//! unfenced module.
 
 use std::sync::Arc;
 
@@ -34,7 +32,7 @@ use axum::{
     routing::{delete, post},
     Json, Router,
 };
-use backbone_auth::company::CompanyContext;
+use backbone_auth::org::OrgContext;
 use chrono::NaiveDate;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
@@ -80,7 +78,6 @@ fn expense_response(status: StatusCode, expense: &Expense) -> axum::response::Re
 #[serde(rename_all = "camelCase")]
 struct ExpenseBody<'a> {
     id: Uuid,
-    company_id: Uuid,
     employee_id: Uuid,
     category_id: Uuid,
     expense_date: NaiveDate,
@@ -102,7 +99,6 @@ impl<'a> From<&'a Expense> for ExpenseBody<'a> {
     fn from(e: &'a Expense) -> Self {
         Self {
             id: e.id,
-            company_id: e.company_id,
             employee_id: e.employee_id,
             category_id: e.category_id,
             expense_date: e.expense_date,
@@ -138,7 +134,7 @@ impl<'a> From<&'a Expense> for ExpenseBody<'a> {
 }
 
 /// The acting principal as a uuid actor stamp, when the token's `sub` parses as one.
-fn actor(t: &CompanyContext) -> Option<Uuid> {
+fn actor(t: &OrgContext) -> Option<Uuid> {
     Uuid::parse_str(&t.user_id).ok()
 }
 
@@ -267,7 +263,7 @@ fn parse_payment_mode(s: Option<&str>) -> Option<ExpensePaymentMode> {
 
 async fn create_expense(
     State(svc): State<Arc<ExpensesWriteService>>,
-    tenant: CompanyContext,
+    org: OrgContext,
     Json(b): Json<CreateExpenseBody>,
 ) -> axum::response::Response {
     let Some(payment_mode) = parse_payment_mode(b.payment_mode.as_deref()) else {
@@ -275,7 +271,6 @@ async fn create_expense(
     };
     match svc
         .create_expense(
-            tenant.company_id,
             NewExpense {
                 employee_id: b.employee_id,
                 category_id: b.category_id,
@@ -287,7 +282,7 @@ async fn create_expense(
                 reference: b.reference,
                 receipt_file_id: b.receipt_file_id,
             },
-            actor(&tenant),
+            actor(&org),
         )
         .await
     {
@@ -298,7 +293,7 @@ async fn create_expense(
 
 async fn update_expense(
     State(svc): State<Arc<ExpensesWriteService>>,
-    tenant: CompanyContext,
+    org: OrgContext,
     Path(expense_id): Path<Uuid>,
     Json(b): Json<UpdateExpenseBody>,
 ) -> axum::response::Response {
@@ -320,7 +315,7 @@ async fn update_expense(
         reference: b.reference,
     };
     match svc
-        .update_expense(tenant.company_id, expense_id, patch, actor(&tenant))
+        .update_expense(expense_id, patch, actor(&org))
         .await
     {
         Ok(expense) => expense_response(StatusCode::OK, &expense),
@@ -330,13 +325,13 @@ async fn update_expense(
 
 async fn submit_expense(
     State(svc): State<Arc<ExpensesWriteService>>,
-    tenant: CompanyContext,
+    org: OrgContext,
     Path(expense_id): Path<Uuid>,
     body: Option<Json<SubmitBody>>,
 ) -> axum::response::Response {
     let note = body.and_then(|Json(b)| b.note);
     match svc
-        .submit_expense(tenant.company_id, expense_id, note, actor(&tenant))
+        .submit_expense(expense_id, note, actor(&org))
         .await
     {
         Ok(expense) => expense_response(StatusCode::OK, &expense),
@@ -346,11 +341,11 @@ async fn submit_expense(
 
 async fn approve_expense(
     State(svc): State<Arc<ExpensesWriteService>>,
-    tenant: CompanyContext,
+    org: OrgContext,
     Path(expense_id): Path<Uuid>,
 ) -> axum::response::Response {
     match svc
-        .approve_expense(tenant.company_id, expense_id, actor(&tenant))
+        .approve_expense(expense_id, actor(&org))
         .await
     {
         Ok(expense) => expense_response(StatusCode::OK, &expense),
@@ -360,13 +355,13 @@ async fn approve_expense(
 
 async fn refuse_expense(
     State(svc): State<Arc<ExpensesWriteService>>,
-    tenant: CompanyContext,
+    org: OrgContext,
     Path(expense_id): Path<Uuid>,
     body: Option<Json<RefuseBody>>,
 ) -> axum::response::Response {
     let reason = body.and_then(|Json(b)| b.reason);
     match svc
-        .refuse_expense(tenant.company_id, expense_id, reason.as_deref(), actor(&tenant))
+        .refuse_expense(expense_id, reason.as_deref(), actor(&org))
         .await
     {
         Ok(expense) => expense_response(StatusCode::OK, &expense),
@@ -376,7 +371,7 @@ async fn refuse_expense(
 
 async fn post_expense(
     State(svc): State<Arc<ExpensesWriteService>>,
-    tenant: CompanyContext,
+    org: OrgContext,
     Path(expense_id): Path<Uuid>,
     Json(b): Json<PostBody>,
 ) -> axum::response::Response {
@@ -385,7 +380,7 @@ async fn post_expense(
         bank_account_id: b.post_accounts.bank_account_id,
     };
     match svc
-        .post_expense(tenant.company_id, expense_id, accounts, actor(&tenant))
+        .post_expense(expense_id, accounts, actor(&org))
         .await
     {
         Ok(expense) => expense_response(StatusCode::OK, &expense),
@@ -395,11 +390,11 @@ async fn post_expense(
 
 async fn settle_expense(
     State(svc): State<Arc<ExpensesWriteService>>,
-    tenant: CompanyContext,
+    org: OrgContext,
     Path(expense_id): Path<Uuid>,
 ) -> axum::response::Response {
     match svc
-        .settle_expense(tenant.company_id, expense_id, actor(&tenant))
+        .settle_expense(expense_id, actor(&org))
         .await
     {
         Ok(expense) => expense_response(StatusCode::OK, &expense),
@@ -409,12 +404,12 @@ async fn settle_expense(
 
 async fn attach_receipt(
     State(svc): State<Arc<ExpensesWriteService>>,
-    tenant: CompanyContext,
+    org: OrgContext,
     Path(expense_id): Path<Uuid>,
     Json(b): Json<ReceiptBody>,
 ) -> axum::response::Response {
     match svc
-        .attach_receipt(tenant.company_id, expense_id, b.receipt_file_id, actor(&tenant))
+        .attach_receipt(expense_id, b.receipt_file_id, actor(&org))
         .await
     {
         Ok(expense) => expense_response(StatusCode::OK, &expense),
@@ -424,11 +419,11 @@ async fn attach_receipt(
 
 async fn detach_receipt(
     State(svc): State<Arc<ExpensesWriteService>>,
-    tenant: CompanyContext,
+    org: OrgContext,
     Path(expense_id): Path<Uuid>,
 ) -> axum::response::Response {
     match svc
-        .detach_receipt(tenant.company_id, expense_id, actor(&tenant))
+        .detach_receipt(expense_id, actor(&org))
         .await
     {
         Ok(expense) => expense_response(StatusCode::OK, &expense),
@@ -438,7 +433,7 @@ async fn detach_receipt(
 
 async fn set_tax_lines(
     State(svc): State<Arc<ExpensesWriteService>>,
-    tenant: CompanyContext,
+    org: OrgContext,
     Path(expense_id): Path<Uuid>,
     Json(b): Json<TaxLinesBody>,
 ) -> axum::response::Response {
@@ -454,7 +449,7 @@ async fn set_tax_lines(
         })
         .collect();
     match svc
-        .set_tax_lines(tenant.company_id, expense_id, lines, actor(&tenant))
+        .set_tax_lines(expense_id, lines, actor(&org))
         .await
     {
         Ok(expense) => expense_response(StatusCode::OK, &expense),
@@ -464,7 +459,7 @@ async fn set_tax_lines(
 
 async fn report(
     State(svc): State<Arc<ExpensesWriteService>>,
-    tenant: CompanyContext,
+    _org: OrgContext,
     Query(q): Query<ReportQuery>,
 ) -> axum::response::Response {
     #[derive(Debug, Serialize)]
@@ -475,7 +470,7 @@ async fn report(
         rows: Vec<ExpenseReportRow>,
     }
     match svc
-        .report(tenant.company_id, q.employee_id, q.from, q.to)
+        .report(q.employee_id, q.from, q.to)
         .await
     {
         Ok(rows) => (
@@ -495,7 +490,7 @@ async fn report(
 
 /// Build the guarded expenses router: validated claim verbs + report projection + category
 /// CRUD + safe reads, NO generic expense/tax-line mutation. Mount under the host's
-/// authenticated (`company_auth`) tree.
+/// org-authenticated tree (the middleware that inserts the request `OrgContext`).
 pub fn create_guarded_expenses_routes(m: &ExpensesModule) -> Router {
     let writes = Router::new()
         .route("/expenses", post(create_expense))

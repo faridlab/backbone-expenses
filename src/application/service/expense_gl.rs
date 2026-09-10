@@ -86,7 +86,13 @@ pub enum EnvelopeError {
 /// never per sheet). `posting_date` = the expense date (Odoo semantics); the idempotency key is
 /// stable per claim, so a retry after a transport failure reuses accounting's dedup instead of
 /// double-posting.
+///
+/// `company_id` is the legacy tenancy twin (ADR-0029): expenses itself is tenant-agnostic, but
+/// the receiving accounting books still key on one (envelope owner + the `source_id` dedup
+/// key). The write service sources it from the ambient org scope's legacy company id and fails
+/// closed when no scope is bound — it never guesses.
 pub fn build_expense_envelope(
+    company_id: Uuid,
     expense: &Expense,
     category: &ExpenseCategory,
     tax_lines: &[TaxLineInput],
@@ -142,8 +148,8 @@ pub fn build_expense_envelope(
     }
 
     let envelope = AccountingPostEnvelope {
-        idempotency_key: format!("expense:{}:{}", expense.company_id, expense.id),
-        company_id: expense.company_id,
+        idempotency_key: format!("expense:{}:{}", company_id, expense.id),
+        company_id,
         branch_id: None,
         source_type: "expense".to_string(),
         source_id: expense.id,

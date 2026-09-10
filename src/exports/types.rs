@@ -49,7 +49,6 @@ impl From<ExpenseId> for Uuid {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExpenseDto {
     pub id: ExpenseId,
-    pub company_id: Uuid,
     pub employee_id: Uuid,
     pub category_id: Uuid,
     pub expense_date: NaiveDate,
@@ -118,7 +117,6 @@ impl From<ExpenseCategoryId> for Uuid {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExpenseCategoryDto {
     pub id: ExpenseCategoryId,
-    pub company_id: Uuid,
     pub code: String,
     pub name: String,
     pub expense_account_id: Uuid,
@@ -178,7 +176,6 @@ impl From<ExpenseTaxLineId> for Uuid {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExpenseTaxLineDto {
     pub id: ExpenseTaxLineId,
-    pub company_id: Uuid,
     pub expense_id: Uuid,
     pub basis: String,
     pub account_id: Uuid,

@@ -2,8 +2,16 @@
 //!
 //! Hand-written (user-owned — see `metaphor.codegen.yaml`). Mirrors the family shape
 //! (party v0.3.3 / timeoff P1 / attendance P2): a concrete struct, an error enum carrying
-//! `code()`/`http_status()`, transaction-per-operation with `company_scope::bind_company_on`,
-//! and all SQL delegated to [`crate::infrastructure::persistence::ExpensesWriteRepository`].
+//! `code()`/`http_status()`, transaction-per-operation with ambient-scope relay, and all SQL
+//! delegated to [`crate::infrastructure::persistence::ExpensesWriteRepository`].
+//!
+//! Tenancy: none, by design (ADR-0029). The module is tenant-agnostic — no tenant key on any
+//! write, no scope parameter on any verb. Every transaction relays the AMBIENT request org
+//! scope, when the composing service bound one (`backbone_orm::org_scope::bind_org_scope_on`):
+//! the decorator-installed row-level fences govern which rows a verb can see and write. A
+//! deployment that runs unfenced gets an unfenced module. The three outbound seams still key
+//! on a company (approvals / GL / reimbursement are unstripped consumers) and source the
+//! documented legacy twin from the ambient scope, failing closed — the module never guesses.
 //!
 //! Lifecycle doctrine (ADR-0016, the TWO-FIELD SPLIT): `approval_state` is hand-set by these
 //! verbs; `state` is the financial lifecycle that follows approval and then advances
@@ -30,7 +38,7 @@ use sqlx::PgPool;
 use std::sync::{Arc, RwLock};
 use uuid::Uuid;
 
-use backbone_orm::company_scope;
+use backbone_orm::org_scope;
 
 use crate::domain::entity::{Expense, ExpensePaymentMode};
 use crate::infrastructure::persistence::{
@@ -53,7 +61,7 @@ use super::GlPostSink;
 pub enum ExpenseWriteError {
     #[error("expense not found")]
     NotFound,
-    #[error("expense category not found for this company")]
+    #[error("expense category not found")]
     CategoryNotFound,
     #[error("amount must be zero or greater — an expense is a claim, not a correction")]
     NegativeAmount,
@@ -87,6 +95,8 @@ pub enum ExpenseWriteError {
     ReimbursementTransport(String),
     #[error("approvals seam error: {0}")]
     ApprovalTransport(String),
+    #[error("no org scope bound: the composing service must resolve one for this request")]
+    NoCompanyScope,
     #[error("internal error: {0}")]
     Internal(String),
     #[error(transparent)]
@@ -114,6 +124,7 @@ impl ExpenseWriteError {
             Self::ReimbursementUnwired => "reimbursement_seam_unwired",
             Self::ReimbursementTransport(_) => "reimbursement_seam_error",
             Self::ApprovalTransport(_) => "approvals_seam_error",
+            Self::NoCompanyScope => "no_org_scope",
             Self::Internal(_) => "internal_error",
             Self::Db(_) => "database_error",
         }
@@ -129,7 +140,7 @@ impl ExpenseWriteError {
             | Self::BadDateRange
             | Self::GlRejected { .. } | Self::ReimbursementUnwired
             | Self::ReimbursementTransport(_) | Self::ApprovalTransport(_) => 422,
-            Self::Internal(_) | Self::Db(_) => 500,
+            Self::NoCompanyScope | Self::Internal(_) | Self::Db(_) => 500,
         }
     }
 }
@@ -156,7 +167,7 @@ impl From<ReimbursementSeamError> for ExpenseWriteError {
 
 // ─── inputs / outcomes ────────────────────────────────────────────────────────
 
-/// What `create_expense` accepts. Amount ≥ 0, ISO-3 currency, an in-company category —
+/// What `create_expense` accepts. Amount ≥ 0, ISO-3 currency, a live category —
 /// validated here, backstopped by the DB CHECKs.
 #[derive(Debug)]
 pub struct NewExpense {
@@ -238,14 +249,38 @@ impl ExpensesWriteService {
         self
     }
 
+    /// One transaction with the AMBIENT request org scope relayed onto it, when the
+    /// composing service bound one. The decorator-installed row-level fences evaluate
+    /// for every statement of the verb. Transaction-local (`set_config(..., true)`):
+    /// nothing leaks onto a pooled connection reused by the next request. Unfenced
+    /// deployments have no ambient scope and skip this entirely.
+    async fn scoped_tx(
+        &self,
+    ) -> Result<sqlx::Transaction<'static, sqlx::Postgres>, ExpenseWriteError> {
+        let mut tx = self.pool.begin().await?;
+        if let Some(scope) = org_scope::current_org_scope() {
+            org_scope::bind_org_scope_on(&mut tx, &scope)
+                .await
+                .map_err(ExpenseWriteError::Db)?;
+        }
+        Ok(tx)
+    }
+
+    /// The company id for the seams that still key on one — the approvals filing, the GL
+    /// envelope, and the reimbursement request. Sourced from the ambient org scope the
+    /// COMPOSING service binds; absent → fail-closed. The module never guesses a company.
+    fn legacy_company_id() -> Result<Uuid, ExpenseWriteError> {
+        org_scope::current_org_scope()
+            .and_then(|s| s.legacy_company_id())
+            .ok_or(ExpenseWriteError::NoCompanyScope)
+    }
+
     // ─── create / update ─────────────────────────────────────────────────────
 
-    /// Create a draft claim. The category must exist in THIS company (a cross-company category
-    /// id is a 404, never leakage); amount ≥ 0 and currency ISO-3 are checked here and again by
-    /// the `expenses_amount_total_nonneg` CHECK at the DB.
+    /// Create a draft claim. The category must exist (amount ≥ 0 and currency ISO-3 are
+    /// checked here and again by the `expenses_amount_total_nonneg` CHECK at the DB).
     pub async fn create_expense(
         &self,
-        company: Uuid,
         claim: NewExpense,
         actor: Option<Uuid>,
     ) -> Result<Expense, ExpenseWriteError> {
@@ -253,18 +288,16 @@ impl ExpensesWriteService {
         validate_currency(&claim.currency)?;
 
         let now = Utc::now();
-        let mut tx = self.pool.begin().await?;
-        company_scope::bind_company_on(&mut tx, company).await?;
+        let mut tx = self.scoped_tx().await?;
 
         let category = self
             .repo
-            .find_category(&mut tx, company, claim.category_id)
+            .find_category(&mut tx, claim.category_id)
             .await?
             .ok_or(ExpenseWriteError::CategoryNotFound)?;
 
         let draft = Expense {
             id: Uuid::new_v4(),
-            company_id: company,
             employee_id: claim.employee_id,
             category_id: category.id,
             expense_date: claim.expense_date,
@@ -292,7 +325,6 @@ impl ExpensesWriteService {
     /// anything the payload carries. A submitted/refused claim matches zero rows → 409.
     pub async fn update_expense(
         &self,
-        company: Uuid,
         expense_id: Uuid,
         patch: ExpensePatch,
         actor: Option<Uuid>,
@@ -303,19 +335,18 @@ impl ExpensesWriteService {
         if let Some(currency) = patch.currency.as_deref() {
             validate_currency(currency)?;
         }
-        let mut tx = self.pool.begin().await?;
-        company_scope::bind_company_on(&mut tx, company).await?;
-        // Re-validate the category in-company when the claim is being reclassified; the
-        // ORIGINAL patch (all fields, not just the category) is applied below either way.
+        let mut tx = self.scoped_tx().await?;
+        // Re-validate the category when the claim is being reclassified; the ORIGINAL patch
+        // (all fields, not just the category) is applied below either way.
         if let Some(category_id) = patch.category_id {
             self.repo
-                .find_category(&mut tx, company, category_id)
+                .find_category(&mut tx, category_id)
                 .await?
                 .ok_or(ExpenseWriteError::CategoryNotFound)?;
         }
         let updated = self
             .repo
-            .update_expense(&mut tx, company, expense_id, &patch, actor, Utc::now())
+            .update_expense(&mut tx, expense_id, &patch, actor, Utc::now())
             .await?;
         tx.commit().await?;
         updated.ok_or(ExpenseWriteError::NotDraft)
@@ -332,21 +363,22 @@ impl ExpensesWriteService {
     /// stays pending in the engine until the requester withdraws it; a retried submit files
     /// idempotently (the engine returns the same live request for the resource) and converges
     /// on the fresh row. Unwired seam ⇒ the claim simply carries no link; a WIRED port that
-    /// fails ⇒ the submit fails (no silently untracked claim).
+    /// fails ⇒ the submit fails (no silently untracked claim). A wired port needs the legacy
+    /// company twin for the filing (the engine's requests still key on one) — sourced off the
+    /// ambient org scope, fail-closed.
     pub async fn submit_expense(
         &self,
-        company: Uuid,
         expense_id: Uuid,
         note: Option<String>,
         actor: Option<Uuid>,
     ) -> Result<Expense, ExpenseWriteError> {
-        let expense = self.get_expense(company, expense_id).await?;
+        let expense = self.get_expense(expense_id).await?;
         if expense.approval_state != crate::domain::entity::ExpenseApprovalState::Draft {
             return Err(ExpenseWriteError::NotDraft);
         }
 
         let filing = ExpenseApprovalFilingRequest {
-            company_id: company,
+            company_id: Self::legacy_company_id()?,
             expense_id,
             employee_id: expense.employee_id,
             category_id: expense.category_id,
@@ -363,13 +395,11 @@ impl ExpensesWriteService {
             Err(e) => return Err(e.into()),
         };
 
-        let mut tx = self.pool.begin().await?;
-        company_scope::bind_company_on(&mut tx, company).await?;
+        let mut tx = self.scoped_tx().await?;
         let submitted = self
             .repo
             .mark_submitted(
                 &mut tx,
-                company,
                 expense_id,
                 approval_request_id,
                 actor,
@@ -393,11 +423,10 @@ impl ExpensesWriteService {
     /// exactly as timeoff P1.
     pub async fn approve_expense(
         &self,
-        company: Uuid,
         expense_id: Uuid,
         actor: Option<Uuid>,
     ) -> Result<Expense, ExpenseWriteError> {
-        let expense = self.get_expense(company, expense_id).await?;
+        let expense = self.get_expense(expense_id).await?;
         if expense.approval_state != crate::domain::entity::ExpenseApprovalState::Submitted {
             return Err(ExpenseWriteError::NotSubmitted);
         }
@@ -413,11 +442,10 @@ impl ExpensesWriteService {
             }
         }
 
-        let mut tx = self.pool.begin().await?;
-        company_scope::bind_company_on(&mut tx, company).await?;
+        let mut tx = self.scoped_tx().await?;
         let approved = self
             .repo
-            .mark_approved(&mut tx, company, expense_id, actor, Utc::now())
+            .mark_approved(&mut tx, expense_id, actor, Utc::now())
             .await?
             .ok_or(ExpenseWriteError::NotSubmitted)?;
         tx.commit().await?;
@@ -428,16 +456,14 @@ impl ExpensesWriteService {
     /// claim). The reason is kept in the audit metadata for the report projection.
     pub async fn refuse_expense(
         &self,
-        company: Uuid,
         expense_id: Uuid,
         reason: Option<&str>,
         actor: Option<Uuid>,
     ) -> Result<Expense, ExpenseWriteError> {
-        let mut tx = self.pool.begin().await?;
-        company_scope::bind_company_on(&mut tx, company).await?;
+        let mut tx = self.scoped_tx().await?;
         let refused = self
             .repo
-            .mark_refused(&mut tx, company, expense_id, reason, actor, Utc::now())
+            .mark_refused(&mut tx, expense_id, reason, actor, Utc::now())
             .await?
             .ok_or(ExpenseWriteError::NotSubmitted)?;
         tx.commit().await?;
@@ -447,18 +473,18 @@ impl ExpensesWriteService {
     /// Post an approved claim to the GL — ONE envelope per expense (HEM-13), built from the
     /// category's expense account + the tax overlay, asserted balanced, then sent through the
     /// sink OUTSIDE the tx. On the ack, `journal_id` + `accounting_post_id` are stamped and
-    /// state → `posted`. The stable idempotency key (`expense:{company}:{id}`) + the
-    /// `state='approved'` row guard make a double post either reuse accounting's dedup or fail
-    /// 409 here — never a double entry. Unwired sink ⇒ 422 `gl_post_rejected` with the sink's
-    /// `gl_seam_unwired` code; the row stays approved and retryable (accounting lands W2).
+    /// state → `posted`. The stable idempotency key (`expense:{company}:{id}`, the company
+    /// being the seams' legacy twin) + the `state='approved'` row guard make a double post
+    /// either reuse accounting's dedup or fail 409 here — never a double entry. Unwired sink
+    /// ⇒ 422 `gl_post_rejected` with the sink's `gl_seam_unwired` code; the row stays approved
+    /// and retryable (accounting lands W2).
     pub async fn post_expense(
         &self,
-        company: Uuid,
         expense_id: Uuid,
         accounts: PostAccounts,
         actor: Option<Uuid>,
     ) -> Result<Expense, ExpenseWriteError> {
-        let expense = self.get_expense(company, expense_id).await?;
+        let expense = self.get_expense(expense_id).await?;
         if expense.accounting_post_id.is_some() || expense.state == crate::domain::entity::ExpenseState::Posted
             || expense.state == crate::domain::entity::ExpenseState::Done
         {
@@ -471,14 +497,13 @@ impl ExpensesWriteService {
         }
 
         let (category, tax_rows) = {
-            let mut tx = self.pool.begin().await?;
-            company_scope::bind_company_on(&mut tx, company).await?;
+            let mut tx = self.scoped_tx().await?;
             let category = self
                 .repo
-                .find_category(&mut tx, company, expense.category_id)
+                .find_category(&mut tx, expense.category_id)
                 .await?
                 .ok_or(ExpenseWriteError::CategoryNotFound)?;
-            let tax_rows = self.repo.tax_lines_for(&mut tx, company, expense_id).await?;
+            let tax_rows = self.repo.tax_lines_for(&mut tx, expense_id).await?;
             tx.commit().await?;
             (category, tax_rows)
         };
@@ -491,8 +516,11 @@ impl ExpensesWriteService {
                 tax_amount: t.tax_amount,
             })
             .collect();
+        // The GL envelope still keys on a company (accounting's books + idempotency dedup are
+        // unstripped): source the legacy twin off the ambient org scope, fail-closed.
+        let company_id = Self::legacy_company_id()?;
         let envelope =
-            build_expense_envelope(&expense, &category, &tax_lines, &accounts)
+            build_expense_envelope(company_id, &expense, &category, &tax_lines, &accounts)
                 .map_err(|e| ExpenseWriteError::Internal(format!("envelope: {e}")))?;
         if !envelope.is_balanced() {
             return Err(ExpenseWriteError::Internal(
@@ -507,11 +535,10 @@ impl ExpensesWriteService {
             }
         })?;
 
-        let mut tx = self.pool.begin().await?;
-        company_scope::bind_company_on(&mut tx, company).await?;
+        let mut tx = self.scoped_tx().await?;
         let posted = self
             .repo
-            .mark_posted(&mut tx, company, expense_id, ack.journal_id, ack.post_id, actor, Utc::now())
+            .mark_posted(&mut tx, expense_id, ack.journal_id, ack.post_id, actor, Utc::now())
             .await?
             .ok_or(ExpenseWriteError::AlreadyPosted)?;
         tx.commit().await?;
@@ -521,14 +548,14 @@ impl ExpensesWriteService {
     /// Settle a posted own-account claim: the reimbursement sink pays the employee, the ack id
     /// stamps `reimbursement_id`, state → `done`. Company-account claims settle at the bank the
     /// moment they post — `settle` refuses them (409). Sink call outside the tx; unwired ⇒
-    /// fails closed (payment composes W2).
+    /// fails closed (payment composes W2). The sink request needs the legacy company twin (the
+    /// payment books still key on one) — sourced off the ambient org scope, fail-closed.
     pub async fn settle_expense(
         &self,
-        company: Uuid,
         expense_id: Uuid,
         actor: Option<Uuid>,
     ) -> Result<Expense, ExpenseWriteError> {
-        let expense = self.get_expense(company, expense_id).await?;
+        let expense = self.get_expense(expense_id).await?;
         if expense.state != crate::domain::entity::ExpenseState::Posted {
             return Err(ExpenseWriteError::NotPosted);
         }
@@ -537,9 +564,8 @@ impl ExpensesWriteService {
         }
 
         let (gross, withholding) = {
-            let mut tx = self.pool.begin().await?;
-            company_scope::bind_company_on(&mut tx, company).await?;
-            let rows = self.repo.tax_lines_for(&mut tx, company, expense_id).await?;
+            let mut tx = self.scoped_tx().await?;
+            let rows = self.repo.tax_lines_for(&mut tx, expense_id).await?;
             tx.commit().await?;
             rows.iter().fold(
                 (expense.amount_total, Decimal::ZERO),
@@ -551,7 +577,7 @@ impl ExpensesWriteService {
         };
 
         let request = ReimbursementRequest {
-            company_id: company,
+            company_id: Self::legacy_company_id()?,
             expense_id,
             employee_id: expense.employee_id,
             amount: gross - withholding,
@@ -560,11 +586,10 @@ impl ExpensesWriteService {
         };
         let ack = self.reimbursements.reimburse(&request).await?;
 
-        let mut tx = self.pool.begin().await?;
-        company_scope::bind_company_on(&mut tx, company).await?;
+        let mut tx = self.scoped_tx().await?;
         let settled = self
             .repo
-            .mark_settled(&mut tx, company, expense_id, ack.payment_id, actor, Utc::now())
+            .mark_settled(&mut tx, expense_id, ack.payment_id, actor, Utc::now())
             .await?
             .ok_or(ExpenseWriteError::NotPosted)?;
         tx.commit().await?;
@@ -577,39 +602,35 @@ impl ExpensesWriteService {
     /// `owner_module=expenses` on its side). Open claims only (draft/submitted).
     pub async fn attach_receipt(
         &self,
-        company: Uuid,
         expense_id: Uuid,
         receipt_file_id: Uuid,
         actor: Option<Uuid>,
     ) -> Result<Expense, ExpenseWriteError> {
-        self.set_receipt(company, expense_id, Some(receipt_file_id), actor)
+        self.set_receipt(expense_id, Some(receipt_file_id), actor)
             .await
     }
 
     /// Detach the receipt scan. Open claims only.
     pub async fn detach_receipt(
         &self,
-        company: Uuid,
         expense_id: Uuid,
         actor: Option<Uuid>,
     ) -> Result<Expense, ExpenseWriteError> {
-        self.set_receipt(company, expense_id, None, actor).await
+        self.set_receipt(expense_id, None, actor).await
     }
 
     /// Shared receipt writer: open claims only (draft/submitted) — once decided, the
     /// evidence set is fixed.
     async fn set_receipt(
         &self,
-        company: Uuid,
         expense_id: Uuid,
         receipt_file_id: Option<Uuid>,
         actor: Option<Uuid>,
     ) -> Result<Expense, ExpenseWriteError> {
-        let mut tx = self.pool.begin().await?;
-        company_scope::bind_company_on(&mut tx, company).await?;
+        let mut tx = self.scoped_tx().await?;
         let updated = self
             .repo
-            .set_receipt(&mut tx, company, expense_id, receipt_file_id, actor, Utc::now())
+            .set_receipt(&mut tx, expense_id, receipt_file_id, actor, Utc::now())
             .await?
             .ok_or(ExpenseWriteError::NotFound)?;
         tx.commit().await?;
@@ -621,7 +642,6 @@ impl ExpensesWriteService {
     /// (DB-CHECKed); the whole replace is one transaction.
     pub async fn set_tax_lines(
         &self,
-        company: Uuid,
         expense_id: Uuid,
         lines: Vec<TaxLineWrite>,
         actor: Option<Uuid>,
@@ -634,11 +654,10 @@ impl ExpensesWriteService {
         }
 
         let now = Utc::now();
-        let mut tx = self.pool.begin().await?;
-        company_scope::bind_company_on(&mut tx, company).await?;
+        let mut tx = self.scoped_tx().await?;
         let expense = self
             .repo
-            .get_expense(&mut tx, company, expense_id)
+            .get_expense(&mut tx, expense_id)
             .await?
             .ok_or(ExpenseWriteError::NotFound)?;
         if expense.approval_state != crate::domain::entity::ExpenseApprovalState::Draft {
@@ -650,14 +669,14 @@ impl ExpensesWriteService {
         // mutated overlay on a submitted claim.
         let inserted = self
             .repo
-            .replace_tax_lines(&mut tx, company, expense_id, &lines, actor, now)
+            .replace_tax_lines(&mut tx, expense_id, &lines, actor, now)
             .await?;
         if inserted != lines.len() as u64 {
             return Err(ExpenseWriteError::NotDraft);
         }
         let expense = self
             .repo
-            .get_expense(&mut tx, company, expense_id)
+            .get_expense(&mut tx, expense_id)
             .await?
             .ok_or(ExpenseWriteError::NotFound)?;
         tx.commit().await?;
@@ -666,17 +685,13 @@ impl ExpensesWriteService {
 
     // ─── reads ───────────────────────────────────────────────────────────────
 
-    /// One live claim (row-truth read; RLS-fenced, cross-company ⇒ 404).
-    pub async fn get_expense(
-        &self,
-        company: Uuid,
-        expense_id: Uuid,
-    ) -> Result<Expense, ExpenseWriteError> {
-        let mut tx = self.pool.begin().await?;
-        company_scope::bind_company_on(&mut tx, company).await?;
+    /// One live claim (row-truth read; under a decorated deployment the row-level fences
+    /// decide visibility — an out-of-scope id simply matches zero rows ⇒ 404).
+    pub async fn get_expense(&self, expense_id: Uuid) -> Result<Expense, ExpenseWriteError> {
+        let mut tx = self.scoped_tx().await?;
         let expense = self
             .repo
-            .get_expense(&mut tx, company, expense_id)
+            .get_expense(&mut tx, expense_id)
             .await?
             .ok_or(ExpenseWriteError::NotFound)?;
         tx.commit().await?;
@@ -687,7 +702,6 @@ impl ExpensesWriteService {
     /// employee × category × state over `[from, to]`, optionally one employee.
     pub async fn report(
         &self,
-        company: Uuid,
         employee_id: Option<Uuid>,
         from: NaiveDate,
         to: NaiveDate,
@@ -695,9 +709,12 @@ impl ExpensesWriteService {
         if from > to {
             return Err(ExpenseWriteError::BadDateRange);
         }
-        Ok(self
+        let mut tx = self.scoped_tx().await?;
+        let rows = self
             .repo
-            .report(&self.pool, company, employee_id, from, to)
-            .await?)
+            .report(&mut tx, employee_id, from, to)
+            .await?;
+        tx.commit().await?;
+        Ok(rows)
     }
 }

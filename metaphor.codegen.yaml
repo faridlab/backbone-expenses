@@ -24,6 +24,11 @@ user_owned:
   - "migrations/20260817091000_expense_invariants.up.sql"
   - "migrations/20260817091000_expense_invariants.down.sql"
 
+  # Hand-authored migrations (the tenancy strip — the strip's ordering guard is
+  # hand-authored logic, not schema-derived emission).
+  - "migrations/20260911061500_strip_tenancy.up.sql"
+  - "migrations/20260911061500_strip_tenancy.down.sql"
+
   # Behavior tests (the golden cases / oracle) + BDD features.
   - "tests/features/**"
   - "tests/integrity_probes.rs"

@@ -1123,7 +1123,6 @@ components:
       type: object
       required:
         - id
-        - company_id
         - employee_id
         - category_id
         - expense_date
@@ -1136,9 +1135,6 @@ components:
         - metadata
       properties:
         id:
-          type: string
-          format: uuid
-        company_id:
           type: string
           format: uuid
         employee_id:
@@ -1205,7 +1201,6 @@ components:
     CreateExpenseRequest:
       type: object
       required:
-        - company_id
         - employee_id
         - category_id
         - expense_date
@@ -1217,9 +1212,6 @@ components:
         - state
         - metadata
       properties:
-        company_id:
-          type: string
-          format: uuid
         employee_id:
           type: string
           format: uuid
@@ -1271,7 +1263,6 @@ components:
     UpdateExpenseRequest:
       type: object
       required:
-        - company_id
         - employee_id
         - category_id
         - expense_date
@@ -1283,9 +1274,6 @@ components:
         - state
         - metadata
       properties:
-        company_id:
-          type: string
-          format: uuid
         employee_id:
           type: string
           format: uuid
@@ -1337,9 +1325,6 @@ components:
     PatchExpenseRequest:
       type: object
       properties:
-        company_id:
-          type: string
-          format: uuid
         employee_id:
           type: string
           format: uuid
@@ -1402,16 +1387,12 @@ components:
       type: object
       required:
         - id
-        - company_id
         - code
         - name
         - expense_account_id
         - metadata
       properties:
         id:
-          type: string
-          format: uuid
-        company_id:
           type: string
           format: uuid
         code:
@@ -1446,15 +1427,11 @@ components:
     CreateExpenseCategoryRequest:
       type: object
       required:
-        - company_id
         - code
         - name
         - expense_account_id
         - metadata
       properties:
-        company_id:
-          type: string
-          format: uuid
         code:
           type: string
         name:
@@ -1474,15 +1451,11 @@ components:
     UpdateExpenseCategoryRequest:
       type: object
       required:
-        - company_id
         - code
         - name
         - expense_account_id
         - metadata
       properties:
-        company_id:
-          type: string
-          format: uuid
         code:
           type: string
         name:
@@ -1502,9 +1475,6 @@ components:
     PatchExpenseCategoryRequest:
       type: object
       properties:
-        company_id:
-          type: string
-          format: uuid
         code:
           type: string
         name:
@@ -1535,7 +1505,6 @@ components:
       type: object
       required:
         - id
-        - company_id
         - expense_id
         - basis
         - account_id
@@ -1544,9 +1513,6 @@ components:
         - metadata
       properties:
         id:
-          type: string
-          format: uuid
-        company_id:
           type: string
           format: uuid
         expense_id:
@@ -1583,7 +1549,6 @@ components:
     CreateExpenseTaxLineRequest:
       type: object
       required:
-        - company_id
         - expense_id
         - basis
         - account_id
@@ -1591,9 +1556,6 @@ components:
         - tax_amount
         - metadata
       properties:
-        company_id:
-          type: string
-          format: uuid
         expense_id:
           type: string
           format: uuid
@@ -1615,7 +1577,6 @@ components:
     UpdateExpenseTaxLineRequest:
       type: object
       required:
-        - company_id
         - expense_id
         - basis
         - account_id
@@ -1623,9 +1584,6 @@ components:
         - tax_amount
         - metadata
       properties:
-        company_id:
-          type: string
-          format: uuid
         expense_id:
           type: string
           format: uuid
@@ -1647,9 +1605,6 @@ components:
     PatchExpenseTaxLineRequest:
       type: object
       properties:
-        company_id:
-          type: string
-          format: uuid
         expense_id:
           type: string
           format: uuid
