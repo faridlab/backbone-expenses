@@ -7,7 +7,7 @@ info:
     This API provides 11 standard CRUD endpoints for each model.
 
 servers:
-  - url: http://localhost:3000
+  - url: /
     description: Development server
 
 tags:
@@ -19,7 +19,7 @@ tags:
     description: ExpenseTaxLine management endpoints
 
 paths:
-  /api/v1/expenses:
+  /api/v1/expenses/expenses:
     get:
       tags:
         - Expenses
@@ -65,7 +65,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
-  /api/v1/expenses/{id}:
+  /api/v1/expenses/expenses/{id}:
     parameters:
       - $ref: '#/components/parameters/IdParam'
 
@@ -137,7 +137,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /api/v1/expenses/bulk:
+  /api/v1/expenses/expenses/bulk:
     post:
       tags:
         - Expenses
@@ -229,7 +229,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/expenses/upsert:
+  /api/v1/expenses/expenses/upsert:
     post:
       tags:
         - Expenses
@@ -259,7 +259,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Expense'
 
-  /api/v1/expenses/trash:
+  /api/v1/expenses/expenses/trash:
     get:
       tags:
         - Expenses
@@ -276,7 +276,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ExpenseList'
 
-  /api/v1/expenses/{id}/restore:
+  /api/v1/expenses/expenses/{id}/restore:
     parameters:
       - $ref: '#/components/parameters/IdParam'
     post:
@@ -294,7 +294,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /api/v1/expenses/empty:
+  /api/v1/expenses/expenses/empty:
     delete:
       tags:
         - Expenses
@@ -311,7 +311,7 @@ paths:
                   deleted_count:
                     type: integer
 
-  /api/v1/expenses/delete/bulk:
+  /api/v1/expenses/expenses/delete/bulk:
     post:
       tags:
         - Expenses
@@ -331,7 +331,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/expenses/restore/bulk:
+  /api/v1/expenses/expenses/restore/bulk:
     post:
       tags:
         - Expenses
@@ -349,7 +349,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/expenses/restore/all:
+  /api/v1/expenses/expenses/restore/all:
     post:
       tags:
         - Expenses
@@ -365,7 +365,7 @@ paths:
                 properties:
                   restored: { type: integer }
 
-  /api/v1/expenses/trash/bulk:
+  /api/v1/expenses/expenses/trash/bulk:
     delete:
       tags:
         - Expenses
@@ -385,7 +385,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/expense_categories:
+  /api/v1/expenses/expense_categories:
     get:
       tags:
         - ExpenseCategories
@@ -431,7 +431,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
-  /api/v1/expense_categories/{id}:
+  /api/v1/expenses/expense_categories/{id}:
     parameters:
       - $ref: '#/components/parameters/IdParam'
 
@@ -503,7 +503,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /api/v1/expense_categories/bulk:
+  /api/v1/expenses/expense_categories/bulk:
     post:
       tags:
         - ExpenseCategories
@@ -595,7 +595,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/expense_categories/upsert:
+  /api/v1/expenses/expense_categories/upsert:
     post:
       tags:
         - ExpenseCategories
@@ -625,7 +625,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ExpenseCategory'
 
-  /api/v1/expense_categories/trash:
+  /api/v1/expenses/expense_categories/trash:
     get:
       tags:
         - ExpenseCategories
@@ -642,7 +642,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ExpenseCategoryList'
 
-  /api/v1/expense_categories/{id}/restore:
+  /api/v1/expenses/expense_categories/{id}/restore:
     parameters:
       - $ref: '#/components/parameters/IdParam'
     post:
@@ -660,7 +660,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /api/v1/expense_categories/empty:
+  /api/v1/expenses/expense_categories/empty:
     delete:
       tags:
         - ExpenseCategories
@@ -677,7 +677,7 @@ paths:
                   deleted_count:
                     type: integer
 
-  /api/v1/expense_categories/delete/bulk:
+  /api/v1/expenses/expense_categories/delete/bulk:
     post:
       tags:
         - ExpenseCategories
@@ -697,7 +697,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/expense_categories/restore/bulk:
+  /api/v1/expenses/expense_categories/restore/bulk:
     post:
       tags:
         - ExpenseCategories
@@ -715,7 +715,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/expense_categories/restore/all:
+  /api/v1/expenses/expense_categories/restore/all:
     post:
       tags:
         - ExpenseCategories
@@ -731,7 +731,7 @@ paths:
                 properties:
                   restored: { type: integer }
 
-  /api/v1/expense_categories/trash/bulk:
+  /api/v1/expenses/expense_categories/trash/bulk:
     delete:
       tags:
         - ExpenseCategories
@@ -751,7 +751,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/expense_tax_lines:
+  /api/v1/expenses/expense_tax_lines:
     get:
       tags:
         - ExpenseTaxLines
@@ -797,7 +797,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
-  /api/v1/expense_tax_lines/{id}:
+  /api/v1/expenses/expense_tax_lines/{id}:
     parameters:
       - $ref: '#/components/parameters/IdParam'
 
@@ -869,7 +869,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /api/v1/expense_tax_lines/bulk:
+  /api/v1/expenses/expense_tax_lines/bulk:
     post:
       tags:
         - ExpenseTaxLines
@@ -961,7 +961,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/expense_tax_lines/upsert:
+  /api/v1/expenses/expense_tax_lines/upsert:
     post:
       tags:
         - ExpenseTaxLines
@@ -991,7 +991,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ExpenseTaxLine'
 
-  /api/v1/expense_tax_lines/trash:
+  /api/v1/expenses/expense_tax_lines/trash:
     get:
       tags:
         - ExpenseTaxLines
@@ -1008,7 +1008,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ExpenseTaxLineList'
 
-  /api/v1/expense_tax_lines/{id}/restore:
+  /api/v1/expenses/expense_tax_lines/{id}/restore:
     parameters:
       - $ref: '#/components/parameters/IdParam'
     post:
@@ -1026,7 +1026,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /api/v1/expense_tax_lines/empty:
+  /api/v1/expenses/expense_tax_lines/empty:
     delete:
       tags:
         - ExpenseTaxLines
@@ -1043,7 +1043,7 @@ paths:
                   deleted_count:
                     type: integer
 
-  /api/v1/expense_tax_lines/delete/bulk:
+  /api/v1/expenses/expense_tax_lines/delete/bulk:
     post:
       tags:
         - ExpenseTaxLines
@@ -1063,7 +1063,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/expense_tax_lines/restore/bulk:
+  /api/v1/expenses/expense_tax_lines/restore/bulk:
     post:
       tags:
         - ExpenseTaxLines
@@ -1081,7 +1081,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/expense_tax_lines/restore/all:
+  /api/v1/expenses/expense_tax_lines/restore/all:
     post:
       tags:
         - ExpenseTaxLines
@@ -1097,7 +1097,7 @@ paths:
                 properties:
                   restored: { type: integer }
 
-  /api/v1/expense_tax_lines/trash/bulk:
+  /api/v1/expenses/expense_tax_lines/trash/bulk:
     delete:
       tags:
         - ExpenseTaxLines
