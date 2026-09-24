@@ -32,7 +32,7 @@
 //!   sink outside the tx; the ack id stamps `reimbursement_id` and the row reaches `done`.
 //!   Unwired ⇒ fail closed. Payment composes in W2.
 
-use chrono::{DateTime, NaiveDate, Utc};
+use chrono::{DateTime, Datelike, NaiveDate, Utc};
 use rust_decimal::Decimal;
 use sqlx::PgPool;
 use std::sync::{Arc, RwLock};
@@ -67,6 +67,12 @@ pub enum ExpenseWriteError {
     NegativeAmount,
     #[error("currency must be a 3-letter ISO code (single-currency v1: IDR)")]
     BadCurrency,
+    #[error("category cap {kind} exceeded: cap {cap}, claim would total {amount}")]
+    CategoryCapExceeded {
+        kind: &'static str,
+        cap: rust_decimal::Decimal,
+        amount: rust_decimal::Decimal,
+    },
     #[error("payment mode must be \"own_account\" or \"company_account\"")]
     BadPaymentMode,
     #[error("tax line basis must be \"input\" or \"withholding\"")]
@@ -121,6 +127,7 @@ impl ExpenseWriteError {
             Self::ApprovalNotGranted => "approval_not_granted",
             Self::NotReimbursable => "not_reimbursable",
             Self::GlRejected { .. } => "gl_post_rejected",
+            Self::CategoryCapExceeded { .. } => "category_cap_exceeded",
             Self::ReimbursementUnwired => "reimbursement_seam_unwired",
             Self::ReimbursementTransport(_) => "reimbursement_seam_error",
             Self::ApprovalTransport(_) => "approvals_seam_error",
@@ -138,6 +145,7 @@ impl ExpenseWriteError {
             | Self::NotReimbursable => 409,
             Self::NegativeAmount | Self::BadCurrency | Self::BadPaymentMode | Self::BadTaxBasis
             | Self::BadDateRange
+            | Self::CategoryCapExceeded { .. }
             | Self::GlRejected { .. } | Self::ReimbursementUnwired
             | Self::ReimbursementTransport(_) | Self::ApprovalTransport(_) => 422,
             Self::NoCompanyScope | Self::Internal(_) | Self::Db(_) => 500,
@@ -375,6 +383,65 @@ impl ExpensesWriteService {
         let expense = self.get_expense(expense_id).await?;
         if expense.approval_state != crate::domain::entity::ExpenseApprovalState::Draft {
             return Err(ExpenseWriteError::NotDraft);
+        }
+        // The category's caps, enforced at the door: one claim too big, or
+        // the month's live claims (this employee + category) about to cross
+        // the line. The scoped-fetch twin rides the request-dedicated
+        // connection — a raw pool read runs unfenced and the caps vanish.
+        let caps: Option<(Option<rust_decimal::Decimal>, Option<rust_decimal::Decimal>)> =
+            backbone_orm::company_scope::fetch_optional_scoped(
+                &self.pool,
+                sqlx::query_as(
+                    r#"SELECT cap_per_claim, cap_per_month FROM expenses.expense_categories
+                        WHERE id = $1 AND (metadata->>'deleted_at') IS NULL"#,
+                )
+                .bind(expense.category_id),
+            )
+            .await?;
+        if let Some((per_claim, per_month)) = caps {
+            if let Some(cap) = per_claim {
+                if expense.amount_total > cap {
+                    return Err(ExpenseWriteError::CategoryCapExceeded {
+                        kind: "per claim",
+                        cap,
+                        amount: expense.amount_total,
+                    });
+                }
+            }
+            if let Some(cap) = per_month {
+                let month_start = chrono::NaiveDate::from_ymd_opt(
+                    expense.expense_date.year(),
+                    expense.expense_date.month(),
+                    1,
+                )
+                .unwrap_or(expense.expense_date);
+                let spent: rust_decimal::Decimal =
+                    backbone_orm::company_scope::fetch_optional_scoped(
+                        &self.pool,
+                        sqlx::query_as::<_, (rust_decimal::Decimal,)>(
+                            r#"SELECT COALESCE(SUM(amount_total), 0) FROM expenses.expenses
+                                WHERE employee_id = $1 AND category_id = $2
+                                  AND expense_date >= $3 AND expense_date < $3 + interval '1 month'
+                                  AND approval_state IN ('draft', 'submitted', 'approved')
+                                  AND id <> $4
+                                  AND (metadata->>'deleted_at') IS NULL"#,
+                        )
+                        .bind(expense.employee_id)
+                        .bind(expense.category_id)
+                        .bind(month_start)
+                        .bind(expense_id),
+                    )
+                    .await?
+                    .map(|(s,)| s)
+                    .unwrap_or_default();
+                if spent + expense.amount_total > cap {
+                    return Err(ExpenseWriteError::CategoryCapExceeded {
+                        kind: "per month",
+                        cap,
+                        amount: spent + expense.amount_total,
+                    });
+                }
+            }
         }
 
         let filing = ExpenseApprovalFilingRequest {

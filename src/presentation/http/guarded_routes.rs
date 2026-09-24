@@ -360,8 +360,21 @@ async fn refuse_expense(
     body: Option<Json<RefuseBody>>,
 ) -> axum::response::Response {
     let reason = body.and_then(|Json(b)| b.reason);
+    // A refusal the employee cannot read is a closed door with no note on
+    // it: the reason is REQUIRED. The verb stores it on the claim's audit
+    // trail; the self-service read surfaces it.
+    let Some(reason) = reason.filter(|r| !r.trim().is_empty()) else {
+        return (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Json(serde_json::json!({
+                "error": "refusal_reason_required",
+                "message": "say why the claim is refused — the employee reads this reason"
+            })),
+        )
+            .into_response();
+    };
     match svc
-        .refuse_expense(expense_id, reason.as_deref(), actor(&org))
+        .refuse_expense(expense_id, Some(reason.trim()), actor(&org))
         .await
     {
         Ok(expense) => expense_response(StatusCode::OK, &expense),

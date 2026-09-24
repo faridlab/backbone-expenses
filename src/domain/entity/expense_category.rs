@@ -54,6 +54,8 @@ pub struct ExpenseCategory {
     pub expense_account_id: Uuid,
     pub default_tax_rate: Option<Decimal>,
     pub description: Option<String>,
+    pub cap_per_claim: Option<Decimal>,
+    pub cap_per_month: Option<Decimal>,
     #[serde(default)]
     #[sqlx(json)]
     pub metadata: AuditMetadata,
@@ -74,6 +76,8 @@ impl ExpenseCategory {
             expense_account_id,
             default_tax_rate: None,
             description: None,
+            cap_per_claim: None,
+            cap_per_month: None,
             metadata: AuditMetadata::default(),
         }
     }
@@ -145,6 +149,18 @@ impl ExpenseCategory {
         self
     }
 
+    /// Set the cap_per_claim field (chainable)
+    pub fn with_cap_per_claim(mut self, value: Decimal) -> Self {
+        self.cap_per_claim = Some(value);
+        self
+    }
+
+    /// Set the cap_per_month field (chainable)
+    pub fn with_cap_per_month(mut self, value: Decimal) -> Self {
+        self.cap_per_month = Some(value);
+        self
+    }
+
     // ==========================================================
     // Partial Update
     // ==========================================================
@@ -167,6 +183,12 @@ impl ExpenseCategory {
                 }
                 "description" => {
                     if let Ok(v) = serde_json::from_value(value) { self.description = v; }
+                }
+                "cap_per_claim" => {
+                    if let Ok(v) = serde_json::from_value(value) { self.cap_per_claim = v; }
+                }
+                "cap_per_month" => {
+                    if let Ok(v) = serde_json::from_value(value) { self.cap_per_month = v; }
                 }
                 _ => {} // ignore unknown fields
             }
@@ -241,6 +263,8 @@ pub struct ExpenseCategoryBuilder {
     expense_account_id: Option<Uuid>,
     default_tax_rate: Option<Decimal>,
     description: Option<String>,
+    cap_per_claim: Option<Decimal>,
+    cap_per_month: Option<Decimal>,
 }
 
 impl ExpenseCategoryBuilder {
@@ -274,6 +298,18 @@ impl ExpenseCategoryBuilder {
         self
     }
 
+    /// Set the cap_per_claim field (optional)
+    pub fn cap_per_claim(mut self, value: Decimal) -> Self {
+        self.cap_per_claim = Some(value);
+        self
+    }
+
+    /// Set the cap_per_month field (optional)
+    pub fn cap_per_month(mut self, value: Decimal) -> Self {
+        self.cap_per_month = Some(value);
+        self
+    }
+
     /// Build the ExpenseCategory entity
     ///
     /// Returns Err if any required field without a default is missing.
@@ -289,6 +325,8 @@ impl ExpenseCategoryBuilder {
             expense_account_id,
             default_tax_rate: self.default_tax_rate,
             description: self.description,
+            cap_per_claim: self.cap_per_claim,
+            cap_per_month: self.cap_per_month,
             metadata: AuditMetadata::default(),
         })
     }

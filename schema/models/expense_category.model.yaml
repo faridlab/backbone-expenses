@@ -42,6 +42,16 @@ models:
         type: string?
         description: "Policy note shown to claimants (e.g. per-diem caps)"
 
+      cap_per_claim:
+        type: decimal?
+        attributes: ["@precision(18,2)"]
+        description: "The ceiling one claim of this category may total. NULL = no per-claim cap. Enforced at submit."
+
+      cap_per_month:
+        type: decimal?
+        attributes: ["@precision(18,2)"]
+        description: "The ceiling one employee may claim of this category per calendar month (live claims summed). NULL = no monthly cap. Enforced at submit."
+
       metadata:
         type: Metadata
         attributes: ["@audit_metadata"]

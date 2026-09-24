@@ -44,6 +44,10 @@ pub struct CreateExpenseCategoryDto {
     pub default_tax_rate: Option<Decimal>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "cap_per_claim")]
+    pub cap_per_claim: Option<Decimal>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "cap_per_month")]
+    pub cap_per_month: Option<Decimal>,
 }
 
 // =============================================================================
@@ -70,6 +74,10 @@ pub struct UpdateExpenseCategoryDto {
     pub default_tax_rate: Option<Decimal>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "cap_per_claim")]
+    pub cap_per_claim: Option<Decimal>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "cap_per_month")]
+    pub cap_per_month: Option<Decimal>,
 }
 
 // =============================================================================
@@ -98,12 +106,16 @@ pub struct PatchExpenseCategoryDto {
     pub default_tax_rate: Option<Decimal>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", alias = "cap_per_claim")]
+    pub cap_per_claim: Option<Decimal>,
+    #[serde(skip_serializing_if = "Option::is_none", alias = "cap_per_month")]
+    pub cap_per_month: Option<Decimal>,
 }
 
 impl PatchExpenseCategoryDto {
     /// Check if any field is set
     pub fn has_changes(&self) -> bool {
-        self.code.is_some() || self.name.is_some() || self.expense_account_id.is_some() || self.default_tax_rate.is_some() || self.description.is_some()
+        self.code.is_some() || self.name.is_some() || self.expense_account_id.is_some() || self.default_tax_rate.is_some() || self.description.is_some() || self.cap_per_claim.is_some() || self.cap_per_month.is_some()
     }
 }
 
@@ -129,6 +141,8 @@ pub struct ExpenseCategoryResponseDto {
     pub expense_account_id: Uuid,
     pub default_tax_rate: Option<Decimal>,
     pub description: Option<String>,
+    pub cap_per_claim: Option<Decimal>,
+    pub cap_per_month: Option<Decimal>,
     pub metadata: AuditMetadata,
 }
 
@@ -205,6 +219,8 @@ impl From<ExpenseCategory> for ExpenseCategoryResponseDto {
             expense_account_id: entity.expense_account_id,
             default_tax_rate: entity.default_tax_rate,
             description: entity.description,
+            cap_per_claim: entity.cap_per_claim,
+            cap_per_month: entity.cap_per_month,
             metadata: entity.metadata,
         }
     }
@@ -232,6 +248,8 @@ impl From<CreateExpenseCategoryDto> for ExpenseCategory {
             expense_account_id: dto.expense_account_id,
             default_tax_rate: dto.default_tax_rate,
             description: dto.description,
+            cap_per_claim: dto.cap_per_claim,
+            cap_per_month: dto.cap_per_month,
             metadata: AuditMetadata::default(),
         }
     }
@@ -246,6 +264,8 @@ impl From<&ExpenseCategory> for ExpenseCategoryResponseDto {
             expense_account_id: entity.expense_account_id.clone(),
             default_tax_rate: entity.default_tax_rate.clone(),
             description: entity.description.clone(),
+            cap_per_claim: entity.cap_per_claim.clone(),
+            cap_per_month: entity.cap_per_month.clone(),
             metadata: entity.metadata.clone(),
         }
     }
@@ -264,6 +284,8 @@ impl backbone_core::ApplyUpdateDto<UpdateExpenseCategoryDto> for ExpenseCategory
         self.expense_account_id = dto.expense_account_id;
         self.default_tax_rate = dto.default_tax_rate;
         self.description = dto.description;
+        self.cap_per_claim = dto.cap_per_claim;
+        self.cap_per_month = dto.cap_per_month;
         Ok(self)
     }
 }
