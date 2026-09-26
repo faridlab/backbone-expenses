@@ -100,10 +100,13 @@ pub fn build_expense_envelope(
 ) -> Result<AccountingPostEnvelope, EnvelopeError> {
     let mut lines = Vec::with_capacity(2 + tax_lines.len());
 
-    // Dr: the category's expense account, gross claim amount, party-tagged to the claimant.
+    // Dr: the category's expense account, gross claim amount. The party
+    // dimension rides ONLY the payable credit below: the posting rules
+    // reject a party on a non-AR/AP line (PartyNotAllowed), and the expense
+    // debit is an ordinary expense line — the description names the claim,
+    // the claimant stays on the credit where they belong.
     lines.push(
         GlPostLine::debit(category.expense_account_id, expense.amount_total)
-            .with_party("employee", expense.employee_id)
             .with_description(format!(
                 "expense {} · {}",
                 category.code, expense.description
