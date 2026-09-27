@@ -19,6 +19,8 @@ models:
   # service's tenancy decorator owns org scoping for all three tables in this module.
   - name: Expense
     collection: expenses
+    # Data-change audit capture (ADR-0025): per-row trigger -> auditlog.capture_data_change.
+    audited: true
     description: "An employee expense claim (per-category account, dual payment mode, two-field lifecycle)."
 
     fields:

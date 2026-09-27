@@ -11,7 +11,6 @@ pub mod expense_category_api_test;
 pub mod expense_tax_line_api_test;
 
 // Re-exports for convenience
-pub use crud_test_base::*;
 pub use expense_api_test::*;
 pub use expense_category_api_test::*;
 pub use expense_tax_line_api_test::*;
