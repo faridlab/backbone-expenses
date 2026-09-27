@@ -262,7 +262,7 @@ dependencies = [
 
 [[package]]
 name = "backbone-expenses"
-version = "0.2.18"
+version = "0.2.19"
 dependencies = [
  "anyhow",
  "async-trait",
