@@ -527,4 +527,13 @@ pub fn create_guarded_expenses_routes(m: &ExpensesModule) -> Router {
         .merge(create_expense_category_routes(m.expense_category_service.clone()))
         .merge(create_expense_tax_line_read_routes(m.expense_tax_line_service.clone()))
         .merge(writes)
+
+    // Bind the composer's request pool (ADR-0029 pool law) for the verbs:
+    // under a tenant mount the writes go to the tenant's database; without
+    // one the composed pool stays the fallback. Applied AFTER the routes —
+    // a Router layer only wraps what was registered before the call.
+    .layer(axum::middleware::from_fn(
+        crate::request_pool::bind_request_pool,
+    ))
+
 }

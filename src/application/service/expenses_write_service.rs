@@ -215,6 +215,12 @@ pub struct ExpensesWriteService {
 }
 
 impl ExpensesWriteService {
+    /// The database this verb runs on: the composer's request pool when
+    /// bound (tenant on a tenant lane), else the composed pool (ADR-0029).
+    fn rpool(&self) -> sqlx::PgPool {
+        crate::request_pool::current().unwrap_or_else(|| self.pool.clone())
+    }
+
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -265,7 +271,7 @@ impl ExpensesWriteService {
     async fn scoped_tx(
         &self,
     ) -> Result<sqlx::Transaction<'static, sqlx::Postgres>, ExpenseWriteError> {
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.rpool().begin().await?;
         if let Some(scope) = org_scope::current_org_scope() {
             org_scope::bind_org_scope_on(&mut tx, &scope)
                 .await
@@ -390,7 +396,7 @@ impl ExpensesWriteService {
         // connection — a raw pool read runs unfenced and the caps vanish.
         let caps: Option<(Option<rust_decimal::Decimal>, Option<rust_decimal::Decimal>)> =
             backbone_orm::company_scope::fetch_optional_scoped(
-                &self.pool,
+                &self.rpool(),
                 sqlx::query_as(
                     r#"SELECT cap_per_claim, cap_per_month FROM expenses.expense_categories
                         WHERE id = $1 AND (metadata->>'deleted_at') IS NULL"#,
@@ -417,7 +423,7 @@ impl ExpensesWriteService {
                 .unwrap_or(expense.expense_date);
                 let spent: rust_decimal::Decimal =
                     backbone_orm::company_scope::fetch_optional_scoped(
-                        &self.pool,
+                        &self.rpool(),
                         sqlx::query_as::<_, (rust_decimal::Decimal,)>(
                             r#"SELECT COALESCE(SUM(amount_total), 0) FROM expenses.expenses
                                 WHERE employee_id = $1 AND category_id = $2
