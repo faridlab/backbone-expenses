@@ -18,13 +18,15 @@
 #![allow(unused_imports)]
 
 // Generated modules
-pub mod request_pool;
 pub mod domain;
 pub mod infrastructure;
 pub mod application;
 pub mod presentation;
 pub mod seeders;
 pub mod exports;
+// <<< CUSTOM MODULES
+pub mod request_pool;
+// END CUSTOM
 
 // Re-exports for convenience - Domain entities
 pub use domain::entity::*;

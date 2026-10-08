@@ -1,10 +1,10 @@
-# __MODULE__ Module - Hooks Index
+# Expenses Module - Hooks Index
 # Version: 2.0
 #
 # Module-level configuration for hooks (lifecycle behaviors).
 # Hooks define: state machines, rules, permissions, triggers, computed fields.
 
-module: __MODULE__
+module: expenses
 version: 2
 
 # Import all hook files.
