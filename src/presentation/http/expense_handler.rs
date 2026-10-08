@@ -51,6 +51,7 @@ impl From<ServiceError> for ExpenseError {
             ServiceError::AlreadyExists(ref msg) => Self::Validation(msg.clone()),
             ServiceError::Repository(ref e) => Self::Database(e.to_string()),
             ServiceError::Internal(ref msg) => Self::Internal(msg.clone()),
+            ServiceError::Violations(_) => Self::Validation(err.to_string()),
         }
     }
 }
@@ -186,4 +187,180 @@ pub fn create_protected_expense_routes<A: AuthMiddleware + Send + Sync + 'static
                 }
             }
         }))
+}
+
+/// Query parameters of the nested subject-history route.
+#[derive(serde::Deserialize)]
+pub struct ExpenseHistoryQuery {
+    /// Reconstruct the row image at this instant instead of listing the trail.
+    pub as_of: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+/// The subject's audit history (ADR-0025 read surface): one entry per
+/// captured change, newest first, positions numbered from the oldest by
+/// (occurred_at, txid). `?as_of=` walks the trail forward from the
+/// anchoring INSERT applying each diff's `to` values, so the row image at
+/// any instant is reconstructible from the trail alone. Deleted subjects
+/// still resolve history: the trail outlives the row (no FK, by contract).
+pub async fn expense_history(
+    axum::extract::State(pool): axum::extract::State<sqlx::PgPool>,
+    axum::extract::Path(id): axum::extract::Path<uuid::Uuid>,
+    axum::extract::Query(q): axum::extract::Query<ExpenseHistoryQuery>,
+) -> axum::response::Response {
+    use axum::http::StatusCode;
+    use axum::response::IntoResponse;
+    use serde_json::json;
+    use sqlx::Row;
+    let subject_id = id.to_string();
+    let mut conn = match pool.acquire().await {
+        Ok(c) => c,
+        Err(e) => {
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                axum::Json(json!({
+                    "error": "history_pool_unavailable",
+                    "message": e.to_string(),
+                })),
+            )
+                .into_response()
+        }
+    };
+    // Trail reads fence like business reads (ADR-0029 decorator): relay the
+    // ambient org scope onto this self-opened connection.
+    if let Some(scope) = backbone_orm::org_scope::current_org_scope() {
+        if let Err(e) = backbone_orm::org_scope::bind_org_scope_on(&mut conn, &scope).await {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                axum::Json(json!({
+                    "error": "history_scope_bind",
+                    "message": e.to_string(),
+                })),
+            )
+                .into_response()
+        }
+    }
+    const SUBJECT_TYPE: &str = "expenses.expenses";
+    match q.as_of {
+        None => {
+            let rows = match sqlx::query("SELECT action, actor, changed, reason, occurred_at, txid, ROW_NUMBER() OVER (ORDER BY occurred_at, txid) AS position, COUNT(*) OVER () AS total FROM auditlog.audit_trails WHERE subject_type = $1 AND subject_id = $2 ORDER BY occurred_at DESC, txid DESC")
+                .bind(SUBJECT_TYPE)
+                .bind(&subject_id)
+                .fetch_all(&mut *conn)
+                .await
+            {
+                Ok(r) => r,
+                Err(e) => {
+                    return (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        axum::Json(json!({
+                            "error": "history_read",
+                            "message": e.to_string(),
+                        })),
+                    )
+                        .into_response()
+                }
+            };
+            let total: i64 = rows.first().map(|r| r.get("total")).unwrap_or(0);
+            let entries: Vec<serde_json::Value> = rows
+                .iter()
+                .map(|r| {
+                    json!({
+                        "position": r.get::<i64, _>("position"),
+                        "action": r.get::<String, _>("action"),
+                        "actor": r.get::<String, _>("actor"),
+                        "changed": r.get::<serde_json::Value, _>("changed"),
+                        "reason": r.get::<Option<String>, _>("reason"),
+                        "occurred_at": r.get::<chrono::DateTime<chrono::Utc>, _>("occurred_at"),
+                        "txid": r.get::<String, _>("txid"),
+                    })
+                })
+                .collect();
+            (
+                StatusCode::OK,
+                axum::Json(json!({
+                    "subject_type": SUBJECT_TYPE,
+                    "subject_id": subject_id,
+                    "total": total,
+                    "entries": entries,
+                })),
+            )
+                .into_response()
+        }
+        Some(as_of) => {
+            let rows = match sqlx::query("SELECT action, changed, occurred_at FROM auditlog.audit_trails WHERE subject_type = $1 AND subject_id = $2 AND occurred_at <= $3 ORDER BY occurred_at ASC, txid ASC")
+                .bind(SUBJECT_TYPE)
+                .bind(&subject_id)
+                .bind(as_of)
+                .fetch_all(&mut *conn)
+                .await
+            {
+                Ok(r) => r,
+                Err(e) => {
+                    return (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        axum::Json(json!({
+                            "error": "history_read",
+                            "message": e.to_string(),
+                        })),
+                    )
+                        .into_response()
+                }
+            };
+            if rows.is_empty() {
+                return (
+                    StatusCode::NOT_FOUND,
+                    axum::Json(json!({
+                        "error": "history_before_subject",
+                        "message": "as_of precedes the subject's first captured event",
+                    })),
+                )
+                    .into_response();
+            }
+            let mut image = serde_json::Map::new();
+            let mut deleted_at: Option<chrono::DateTime<chrono::Utc>> = None;
+            for r in &rows {
+                let action: String = r.get("action");
+                let changed: serde_json::Value = r.get("changed");
+                if action == "delete" {
+                    image.clear();
+                    deleted_at = Some(r.get("occurred_at"));
+                    continue;
+                }
+                deleted_at = None;
+                if let Some(fields) = changed.as_object() {
+                    for (field, diff) in fields {
+                        if let Some(to) = diff.get("to") {
+                            image.insert(field.clone(), to.clone());
+                        }
+                    }
+                }
+            }
+            if let Some(at) = deleted_at {
+                return (
+                    StatusCode::NOT_FOUND,
+                    axum::Json(json!({
+                        "error": "subject_deleted_before_as_of",
+                        "deleted_at": at,
+                    })),
+                )
+                    .into_response();
+            }
+            (
+                StatusCode::OK,
+                axum::Json(json!({
+                    "as_of": as_of,
+                    "image": serde_json::Value::Object(image),
+                })),
+            )
+                .into_response()
+        }
+    }
+}
+
+/// The nested history route, merged next to the model's CRUD router by the
+/// module's route composer (the pool there is the tenant-resolved one).
+pub fn create_expense_history_route(pool: sqlx::PgPool) -> axum::Router {
+    axum::Router::new()
+        .route("/expenses/:id/history", axum::routing::get(expense_history))
+        .with_state(pool)
 }

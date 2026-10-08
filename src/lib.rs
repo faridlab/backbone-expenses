@@ -53,7 +53,6 @@ pub use application::service::{
 pub use presentation::http::create_guarded_expenses_routes;
 pub use backbone_orm::org_scope;
 // END CUSTOM
-
 use std::sync::Arc;
 use axum::Router;
 use sqlx::PgPool;
@@ -161,6 +160,8 @@ impl ExpensesModule {
 /// Builder for ExpensesModule
 pub struct ExpensesModuleBuilder {
     db_pool: Option<PgPool>,
+    // <<< CUSTOM BUILDER FIELDS
+    // END CUSTOM
 }
 
 impl ExpensesModuleBuilder {
@@ -168,6 +169,8 @@ impl ExpensesModuleBuilder {
     pub fn new() -> Self {
         Self {
             db_pool: None,
+            // <<< CUSTOM BUILDER DEFAULTS
+            // END CUSTOM
         }
     }
 

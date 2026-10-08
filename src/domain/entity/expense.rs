@@ -310,6 +310,7 @@ impl backbone_orm::EntityRepoMeta for Expense {
         m.insert("payment_mode".to_string(), "expense_payment_mode".to_string());
         m.insert("approval_state".to_string(), "expense_approval_state".to_string());
         m.insert("state".to_string(), "expense_state".to_string());
+        m.insert("expense_date".to_string(), "date".to_string());
         m
     }
     fn search_fields() -> &'static [&'static str] {

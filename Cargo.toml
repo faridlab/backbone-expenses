@@ -1,6 +1,6 @@
 [package]
 name = "backbone-expenses"
-version = "0.2.25"
+version = "0.3.0"
 edition = "2021"
 description = "Employee expense claims — categories, tax overlay, GL posting + reimbursement seams (pillar-people H-4)"
 license = "MIT OR Apache-2.0"
@@ -20,16 +20,16 @@ path = "src/lib.rs"
 # or `rev = "<commit-sha>"`. Cargo dedupes the git fetch — the repo is only
 # cloned once even though four crates reference it.
 # -----------------------------------------------------------------------------
-backbone-core = { version = "2.7.35", features = ["postgres"] }
-backbone-orm = { version = "2.7.35" }
-backbone-auth = { version = "2.7.35", features = ["axum"] }
-backbone-messaging = { version = "2.7.35" }
+backbone-core = { version = "3.0.0", features = ["postgres"] }
+backbone-orm = { version = "3.0.0" }
+backbone-auth = { version = "3.0.0", features = ["axum"] }
+backbone-messaging = { version = "3.0.0" }
 # The shared GL-posting wire contract (shipped on backbone-framework v2.7.5+):
 # AccountingPostEnvelope / GlPostLine / GlPostAck / GlPostRejected / GlPostSink.
 # Expenses is a pure emitter (source_type = "expense"); the composing app
 # implements the sink over accounting's PostingService. Zero Cargo edge into
 # backbone-accounting (ADR-0004) — mirrors billing/payment_gl.rs.
-backbone-gl-posting = { version = "2.7.35" }
+backbone-gl-posting = { version = "3.0.0" }
 
 # Core async runtime and serialization
 tokio = { version = "1.0", features = ["full"] }
