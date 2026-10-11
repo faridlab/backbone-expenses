@@ -394,7 +394,7 @@ impl backbone_core::ApplyUpdateDto<UpdateExpenseDto> for Expense {
 // Custom DTOs
 // =============================================================================
 
-// <<< CUSTOM DTOs
 // Add custom DTOs specific to Expense here.
 // This section will be preserved during regeneration.
 // >>> END CUSTOM DTOs
+

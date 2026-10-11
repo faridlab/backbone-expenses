@@ -16,5 +16,3 @@ pub use expense_category_event_handlers::ExpenseCategoryEventHandler;
 pub use expense_tax_line_events::{ExpenseTaxLineEvent, ExpenseTaxLineEventPublisher, NoopExpenseTaxLineEventPublisher};
 pub use expense_tax_line_event_handlers::ExpenseTaxLineEventHandler;
 
-// <<< CUSTOM
-// END CUSTOM

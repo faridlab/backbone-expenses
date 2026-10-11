@@ -283,7 +283,7 @@ impl backbone_core::ApplyUpdateDto<UpdateExpenseTaxLineDto> for ExpenseTaxLine {
 // Custom DTOs
 // =============================================================================
 
-// <<< CUSTOM DTOs
 // Add custom DTOs specific to ExpenseTaxLine here.
 // This section will be preserved during regeneration.
 // >>> END CUSTOM DTOs
+

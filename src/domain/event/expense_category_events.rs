@@ -11,8 +11,6 @@ use crate::domain::entity::ExpenseCategory;
 /// enum containing a `Crud(CrudEvent<ExpenseCategory>)` variant.
 pub type ExpenseCategoryEvent = CrudEvent<ExpenseCategory>;
 
-// <<< CUSTOM
-// END CUSTOM
 
 use backbone_messaging::{CrudEventPublisher, NoOpCrudEventPublisher};
 use std::sync::Arc;

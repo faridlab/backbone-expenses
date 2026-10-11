@@ -172,8 +172,6 @@ impl ExpenseTaxLine {
         }
     }
 
-    // <<< CUSTOM METHODS START >>>
-    // <<< CUSTOM METHODS END >>>
 }
 
 impl super::Entity for ExpenseTaxLine {

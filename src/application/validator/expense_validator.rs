@@ -18,9 +18,5 @@ pub fn expense_validator() -> ExpenseValidator {
         .rule(RequiredString::new("description", |e: &Expense| &e.description))
         .rule(RequiredString::new("currency", |e: &Expense| &e.currency))
         .rule(OptionalNotBlank::new("reference", |e: &Expense| e.reference.as_deref()))
-    // <<< CUSTOM RULES
-    // END CUSTOM RULES
 }
 
-// <<< CUSTOM
-// END CUSTOM

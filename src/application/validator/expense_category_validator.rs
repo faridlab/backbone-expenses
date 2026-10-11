@@ -18,9 +18,5 @@ pub fn expense_category_validator() -> ExpenseCategoryValidator {
         .rule(RequiredString::new("code", |e: &ExpenseCategory| &e.code))
         .rule(RequiredString::new("name", |e: &ExpenseCategory| &e.name))
         .rule(OptionalNotBlank::new("description", |e: &ExpenseCategory| e.description.as_deref()))
-    // <<< CUSTOM RULES
-    // END CUSTOM RULES
 }
 
-// <<< CUSTOM
-// END CUSTOM

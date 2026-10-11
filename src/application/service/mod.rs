@@ -11,14 +11,10 @@ pub mod expense_service;
 pub mod expense_category_service;
 pub mod expense_tax_line_service;
 
-// <<< CUSTOM
-// END CUSTOM
 
 pub use expense_service::ExpenseService;
 pub use expense_category_service::ExpenseCategoryService;
 pub use expense_tax_line_service::ExpenseTaxLineService;
-// <<< CUSTOM
-// END CUSTOM
 
 // This directory's extension (hand-written; ADR-0031).
 include!("mod.ext.rs");

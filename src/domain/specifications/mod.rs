@@ -10,5 +10,3 @@ pub mod expense_specification;
 pub mod expense_category_specification;
 pub mod expense_tax_line_specification;
 
-// <<< CUSTOM
-// END CUSTOM

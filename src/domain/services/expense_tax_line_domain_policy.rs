@@ -18,5 +18,3 @@ use crate::domain::entity::ExpenseTaxLine;
 /// service. `PermitAllPolicy` is the safe default until then.
 pub type ExpenseTaxLineDomainPolicy = PermitAllPolicy<ExpenseTaxLine>;
 
-// <<< CUSTOM
-// END CUSTOM

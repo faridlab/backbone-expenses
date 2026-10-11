@@ -107,6 +107,4 @@ mod tests {
 // CUSTOM TESTS
 // ============================================================================
 
-// <<< CUSTOM TESTS START >>>
 // Add ExpenseTaxLine specific tests here
-// <<< CUSTOM TESTS END >>>

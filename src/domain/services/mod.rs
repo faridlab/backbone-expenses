@@ -10,5 +10,3 @@ pub use expense_domain_policy::ExpenseDomainPolicy;
 pub use expense_category_domain_policy::ExpenseCategoryDomainPolicy;
 pub use expense_tax_line_domain_policy::ExpenseTaxLineDomainPolicy;
 
-// <<< CUSTOM
-// END CUSTOM

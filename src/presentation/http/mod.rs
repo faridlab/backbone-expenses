@@ -9,15 +9,11 @@ pub mod expense_handler;
 pub mod expense_category_handler;
 pub mod expense_tax_line_handler;
 
-// <<< CUSTOM
-// END CUSTOM
 
 // Re-exports
 pub use expense_handler::{create_expense_routes, create_expense_read_routes, create_expense_write_routes, create_expense_history_route};
 pub use expense_category_handler::{create_expense_category_routes, create_expense_category_read_routes, create_expense_category_write_routes};
 pub use expense_tax_line_handler::{create_expense_tax_line_routes, create_expense_tax_line_read_routes, create_expense_tax_line_write_routes};
-// <<< CUSTOM
-// END CUSTOM
 
 // This directory's extension (hand-written; ADR-0031).
 include!("mod.ext.rs");

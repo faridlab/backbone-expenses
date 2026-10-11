@@ -17,9 +17,5 @@ pub fn expense_tax_line_validator() -> ExpenseTaxLineValidator {
     EntityValidator::new()
         .rule(RequiredString::new("basis", |e: &ExpenseTaxLine| &e.basis))
         .rule(OptionalNotBlank::new("description", |e: &ExpenseTaxLine| e.description.as_deref()))
-    // <<< CUSTOM RULES
-    // END CUSTOM RULES
 }
 
-// <<< CUSTOM
-// END CUSTOM

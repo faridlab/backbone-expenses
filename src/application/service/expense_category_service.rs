@@ -32,5 +32,3 @@ pub type ExpenseCategoryService = GenericCrudService<
     ExpenseCategoryRepository,
 >;
 
-// <<< CUSTOM
-// END CUSTOM

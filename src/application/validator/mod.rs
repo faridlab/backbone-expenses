@@ -13,5 +13,3 @@ pub use expense_validator::{ExpenseValidator, expense_validator};
 pub use expense_category_validator::{ExpenseCategoryValidator, expense_category_validator};
 pub use expense_tax_line_validator::{ExpenseTaxLineValidator, expense_tax_line_validator};
 
-// <<< CUSTOM
-// END CUSTOM

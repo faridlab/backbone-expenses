@@ -18,5 +18,3 @@ use crate::domain::entity::ExpenseCategory;
 /// service. `PermitAllPolicy` is the safe default until then.
 pub type ExpenseCategoryDomainPolicy = PermitAllPolicy<ExpenseCategory>;
 
-// <<< CUSTOM
-// END CUSTOM
