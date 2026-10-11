@@ -25,8 +25,17 @@ pub mod presentation;
 pub mod seeders;
 pub mod exports;
 // <<< CUSTOM MODULES
-pub mod request_pool;
 // END CUSTOM
+
+// The module's extension (hand-written; ADR-0031).
+#[path = "lib.ext.rs"]
+mod lib_ext;
+pub use lib_ext::*;
+/// This crate's module and builder under fixed names, for the extension's `impl` blocks.
+#[allow(dead_code)]
+pub(crate) type ThisModule = ExpensesModule;
+#[allow(dead_code)]
+pub(crate) type ThisModuleBuilder = ExpensesModuleBuilder;
 
 // Re-exports for convenience - Domain entities
 pub use domain::entity::*;
@@ -39,20 +48,6 @@ pub use application::service::ExpenseService;
 pub use application::service::ExpenseCategoryService;
 pub use application::service::ExpenseTaxLineService;
 
-// <<< CUSTOM
-// The validated write path (H-4), its seam ports (approvals / GL / reimbursement — all
-// default-unwired, fail-closed), the guarded HTTP composition, and `org_scope` re-exported
-// for the tenancy probe suite (tests see only the public surface — party/attendance convention).
-pub use application::service::{
-    build_expense_envelope, AccountingPostEnvelope, ApprovalFiling, ApprovalSeamError,
-    ApprovalVerdict, EnvelopeError, ExpenseApprovalFilingRequest, ExpenseWriteError,
-    ExpensesWriteService, GlPostAck, GlPostLine, GlPostRejected, GlPostSink, NewExpense,
-    PostAccounts, ReimbursementAck, ReimbursementRequest, ReimbursementSeamError,
-    ReimbursementSink, TaxLineInput, UnwiredApprovals, UnwiredGlSink, UnwiredReimbursement,
-};
-pub use presentation::http::create_guarded_expenses_routes;
-pub use backbone_orm::org_scope;
-// END CUSTOM
 use std::sync::Arc;
 use axum::Router;
 use sqlx::PgPool;
@@ -73,11 +68,35 @@ pub struct ExpensesModule {
     pub(crate) expense_service: Arc<ExpenseService>,
     pub(crate) expense_category_service: Arc<ExpenseCategoryService>,
     pub(crate) expense_tax_line_service: Arc<ExpenseTaxLineService>,
+    /// The module's extension state (`lib.ext.rs`); its fields read through `Deref`.
+    pub(crate) ext: ModuleExt,
     // <<< CUSTOM FIELDS
-    // The validated claim verbs (create/update/submit/approve/refuse/post/settle, tax overlay,
-    // receipts) and their three seam ports.
-    pub(crate) expenses_write_service: Arc<ExpensesWriteService>,
     // END CUSTOM
+}
+
+impl std::ops::Deref for ExpensesModule {
+    type Target = ModuleExt;
+    fn deref(&self) -> &Self::Target {
+        &self.ext
+    }
+}
+
+impl std::ops::DerefMut for ExpensesModule {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.ext
+    }
+}
+
+/// What the extension's `build` hook receives from the generated build (ADR-0031).
+#[allow(dead_code)]
+pub(crate) struct ModuleParts<'a> {
+    pub(crate) db_pool: &'a PgPool,
+    pub(crate) expense_service: &'a Arc<ExpenseService>,
+    pub(crate) expense_repository: &'a Arc<ExpenseRepository>,
+    pub(crate) expense_category_service: &'a Arc<ExpenseCategoryService>,
+    pub(crate) expense_category_repository: &'a Arc<ExpenseCategoryRepository>,
+    pub(crate) expense_tax_line_service: &'a Arc<ExpenseTaxLineService>,
+    pub(crate) expense_tax_line_repository: &'a Arc<ExpenseTaxLineRepository>,
 }
 
 impl ExpensesModule {
@@ -133,35 +152,29 @@ impl ExpensesModule {
     }
 
     // <<< CUSTOM METHODS
-    /// The validated write path (seams default-unwired). Composition points that need to wire
-    /// the approvals/GL/reimbursement ports build their own from the same pool:
-    /// `ExpensesWriteService::new(pool).with_gl_sink(sink).with_approvals(port)`.
-    pub fn expenses_write_service(&self) -> Arc<ExpensesWriteService> {
-        self.expenses_write_service.clone()
-    }
-
-    /// Arm the approvals seam on the module-built service after the fact (last writer wins;
-    /// callers arm exactly once at composition time).
-    pub fn set_expenses_approvals(&self, port: Arc<dyn ApprovalFiling>) {
-        self.expenses_write_service.set_approvals(port);
-    }
-
-    /// Replace the write service at the composition root — how a host swaps in a service built
-    /// with real adapters over the fail-closed seams (GL posting, reimbursement) or its own
-    /// approvals port. Consuming `self` keeps the chain reading naturally; call before mounting
-    /// routes, the module is consumed once at startup.
-    pub fn with_expenses_write_service(mut self, svc: Arc<ExpensesWriteService>) -> Self {
-        self.expenses_write_service = svc;
-        self
-    }
     // END CUSTOM
 }
 
 /// Builder for ExpensesModule
 pub struct ExpensesModuleBuilder {
     db_pool: Option<PgPool>,
+    /// The builder's extension state (`lib.ext.rs`); its fields read through `Deref`.
+    ext: ModuleBuilderExt,
     // <<< CUSTOM BUILDER FIELDS
     // END CUSTOM
+}
+
+impl std::ops::Deref for ExpensesModuleBuilder {
+    type Target = ModuleBuilderExt;
+    fn deref(&self) -> &Self::Target {
+        &self.ext
+    }
+}
+
+impl std::ops::DerefMut for ExpensesModuleBuilder {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.ext
+    }
 }
 
 impl ExpensesModuleBuilder {
@@ -169,6 +182,7 @@ impl ExpensesModuleBuilder {
     pub fn new() -> Self {
         Self {
             db_pool: None,
+            ext: Default::default(),
             // <<< CUSTOM BUILDER DEFAULTS
             // END CUSTOM
         }
@@ -201,17 +215,25 @@ impl ExpensesModuleBuilder {
         let expense_tax_line_service = Arc::new(ExpenseTaxLineService::with_repository(expense_tax_line_repository.clone()));
 
         // <<< CUSTOM
-        // The validated write path (H-4): verbs + seams, all default-unwired (approve is
-        // TR2-fail-closed, post/settle fail closed until W2/P6 wire the adapters).
-        let expenses_write_service = Arc::new(ExpensesWriteService::new(db_pool.clone()));
         // END CUSTOM
+
+        // The extension builds its own state from what the generated build made.
+        let ext = self.ext.build(&ModuleParts {
+            db_pool: &db_pool,
+            expense_service: &expense_service,
+            expense_repository: &expense_repository,
+            expense_category_service: &expense_category_service,
+            expense_category_repository: &expense_category_repository,
+            expense_tax_line_service: &expense_tax_line_service,
+            expense_tax_line_repository: &expense_tax_line_repository,
+        })?;
 
         Ok(ExpensesModule {
             expense_service,
             expense_category_service,
             expense_tax_line_service,
+            ext,
             // <<< CUSTOM
-            expenses_write_service,
             // END CUSTOM
         })
     }
@@ -222,3 +244,6 @@ impl Default for ExpensesModuleBuilder {
         Self::new()
     }
 }
+
+// This directory's extension (hand-written; ADR-0031).
+include!("mod.ext.rs");

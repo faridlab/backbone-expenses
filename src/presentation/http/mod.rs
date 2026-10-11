@@ -10,9 +10,6 @@ pub mod expense_category_handler;
 pub mod expense_tax_line_handler;
 
 // <<< CUSTOM
-// The guarded composition (validated claim verbs + report projection + category CRUD +
-// safe reads) — the RECOMMENDED mount for production hosts.
-pub mod guarded_routes;
 // END CUSTOM
 
 // Re-exports
@@ -20,5 +17,7 @@ pub use expense_handler::{create_expense_routes, create_expense_read_routes, cre
 pub use expense_category_handler::{create_expense_category_routes, create_expense_category_read_routes, create_expense_category_write_routes};
 pub use expense_tax_line_handler::{create_expense_tax_line_routes, create_expense_tax_line_read_routes, create_expense_tax_line_write_routes};
 // <<< CUSTOM
-pub use guarded_routes::create_guarded_expenses_routes;
 // END CUSTOM
+
+// This directory's extension (hand-written; ADR-0031).
+include!("mod.ext.rs");

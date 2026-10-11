@@ -10,8 +10,6 @@ mod expense_tax_line_repository;
 
 // Custom persistence modules
 // <<< CUSTOM
-// Hand-written repository: every SQL statement of the validated write path (H-4).
-pub mod expenses_write_repository;
 // END CUSTOM
 
 // Re-exports
@@ -28,7 +26,7 @@ pub use backbone_orm::repository::{
 
 // Re-export custom persistence types
 // <<< CUSTOM
-pub use expenses_write_repository::{
-    ExpensePatch, ExpenseReportRow, ExpensesWriteRepository, TaxLineWrite,
-};
 // END CUSTOM
+
+// This directory's extension (hand-written; ADR-0031).
+include!("mod.ext.rs");
