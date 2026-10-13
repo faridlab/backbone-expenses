@@ -1,0 +1,17 @@
+-- Down: drop the declared rule constraints for expenses module
+ALTER TABLE IF EXISTS expenses.expense_tax_lines DROP CONSTRAINT IF EXISTS ck_expense_tax_lines_description_max_length__max_length;
+ALTER TABLE IF EXISTS expenses.expense_tax_lines DROP CONSTRAINT IF EXISTS ck_expense_tax_lines_account_id_required__required;
+ALTER TABLE IF EXISTS expenses.expense_tax_lines DROP CONSTRAINT IF EXISTS ck_expense_tax_lines_basis_max_length__max_length;
+ALTER TABLE IF EXISTS expenses.expense_tax_lines DROP CONSTRAINT IF EXISTS ck_expense_tax_lines_basis_required__required;
+ALTER TABLE IF EXISTS expenses.expense_tax_lines DROP CONSTRAINT IF EXISTS ck_expense_tax_lines_expense_id_required__required;
+ALTER TABLE IF EXISTS expenses.expense_categories DROP CONSTRAINT IF EXISTS ck_expense_categories_expense_account_id_required__required;
+ALTER TABLE IF EXISTS expenses.expense_categories DROP CONSTRAINT IF EXISTS ck_expense_categories_name_max_length__max_length;
+ALTER TABLE IF EXISTS expenses.expense_categories DROP CONSTRAINT IF EXISTS ck_expense_categories_name_required__required;
+ALTER TABLE IF EXISTS expenses.expense_categories DROP CONSTRAINT IF EXISTS ck_expense_categories_code_max_length__max_length;
+ALTER TABLE IF EXISTS expenses.expense_categories DROP CONSTRAINT IF EXISTS ck_expense_categories_code_required__required;
+ALTER TABLE IF EXISTS expenses.expenses DROP CONSTRAINT IF EXISTS ck_expenses_reference_max_length__max_length;
+ALTER TABLE IF EXISTS expenses.expenses DROP CONSTRAINT IF EXISTS ck_expenses_currency_max_length__max_length;
+ALTER TABLE IF EXISTS expenses.expenses DROP CONSTRAINT IF EXISTS ck_expenses_description_max_length__max_length;
+ALTER TABLE IF EXISTS expenses.expenses DROP CONSTRAINT IF EXISTS ck_expenses_description_required__required;
+ALTER TABLE IF EXISTS expenses.expenses DROP CONSTRAINT IF EXISTS ck_expenses_category_id_required__required;
+ALTER TABLE IF EXISTS expenses.expenses DROP CONSTRAINT IF EXISTS ck_expenses_employee_id_required__required;
