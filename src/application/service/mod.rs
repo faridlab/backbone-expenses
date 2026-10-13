@@ -15,6 +15,9 @@ pub mod expense_tax_line_service;
 pub use expense_service::ExpenseService;
 pub use expense_category_service::ExpenseCategoryService;
 pub use expense_tax_line_service::ExpenseTaxLineService;
+pub use expense_service::ExpenseRowRules;
+pub use expense_category_service::ExpenseCategoryRowRules;
+pub use expense_tax_line_service::ExpenseTaxLineRowRules;
 
 // This directory's extension (hand-written; ADR-0031).
 include!("mod.ext.rs");

@@ -32,3 +32,57 @@ pub type ExpenseService = GenericCrudService<
     ExpenseRepository,
 >;
 
+/// The rules the schema declares for Expense, checked against the row a create or update
+/// would store. The generated build attaches it to [`ExpenseService`]. A refusing rule's
+/// break answers 422; a rule in shadow is logged under `backbone::write_guard` and the
+/// write goes ahead.
+pub struct ExpenseRowRules;
+
+#[async_trait::async_trait]
+impl backbone_core::write_guard::WriteGuard<Expense> for ExpenseRowRules {
+    async fn check(
+        &self,
+        ctx: &backbone_core::write_guard::WriteCtx<'_, Expense>,
+    ) -> backbone_core::write_guard::GuardOutcome {
+        use backbone_core::row_rule as r;
+        use backbone_core::violation::Violation;
+        use backbone_core::write_guard::{GuardOutcome, WriteKind};
+        let (create, update) = (ctx.kind == WriteKind::Create, ctx.kind == WriteKind::Update);
+        let Some(after) = ctx.after.filter(|_| create || update) else {
+            return GuardOutcome::allow();
+        };
+        let Ok(row) = serde_json::to_value(after) else {
+            return GuardOutcome::allow();
+        };
+        let row = &row;
+        let old = ctx.before.and_then(|b| serde_json::to_value(b).ok());
+        let mut shadow = Vec::new();
+        let mut refuse = Vec::new();
+        // `employee_id_required` (@required on Expense.employee_id)
+        if (create || (update && r::changed(old.as_ref(), row, &["employee_id"]))) && !r::holds(&r::and(r::is_not_null(r::field(row, "employee_id")), r::not(r::is_empty(r::trim(r::field(row, "employee_id")))))) {
+            refuse.push(Violation::new("employee_id", "required", "employee_id is required"));
+        }
+        // `category_id_required` (@required on Expense.category_id)
+        if (create || (update && r::changed(old.as_ref(), row, &["category_id"]))) && !r::holds(&r::and(r::is_not_null(r::field(row, "category_id")), r::not(r::is_empty(r::trim(r::field(row, "category_id")))))) {
+            refuse.push(Violation::new("category_id", "required", "category_id is required"));
+        }
+        // `description_required` (@required on Expense.description)
+        if (create || (update && r::changed(old.as_ref(), row, &["description"]))) && !r::holds(&r::and(r::is_not_null(r::field(row, "description")), r::not(r::is_empty(r::trim(r::field(row, "description")))))) {
+            refuse.push(Violation::new("description", "required", "description is required"));
+        }
+        // `description_max_length` (@length(max=500) on Expense.description)
+        if (create || (update && r::changed(old.as_ref(), row, &["description"]))) && !r::holds(&r::le(r::length(r::field(row, "description")), r::Val::Num(500.0_f64))) {
+            shadow.push(Violation::new("description", "max_length", "description must be at most 500 characters").with_param("max", 500_i64));
+        }
+        // `currency_max_length` (@max(3) on Expense.currency)
+        if (create || (update && r::changed(old.as_ref(), row, &["currency"]))) && !r::holds(&r::le(r::length(r::field(row, "currency")), r::Val::Num(3.0_f64))) {
+            shadow.push(Violation::new("currency", "max_length", "currency must be at most 3 characters").with_param("max", 3_i64));
+        }
+        // `reference_max_length` (@length(max=200) on Expense.reference)
+        if (create || (update && r::changed(old.as_ref(), row, &["reference"]))) && !r::holds(&r::le(r::length(r::field(row, "reference")), r::Val::Num(200.0_f64))) {
+            shadow.push(Violation::new("reference", "max_length", "reference must be at most 200 characters").with_param("max", 200_i64));
+        }
+        GuardOutcome { refuse, shadow }
+    }
+}
+

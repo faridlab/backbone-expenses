@@ -32,3 +32,53 @@ pub type ExpenseCategoryService = GenericCrudService<
     ExpenseCategoryRepository,
 >;
 
+/// The rules the schema declares for ExpenseCategory, checked against the row a create or update
+/// would store. The generated build attaches it to [`ExpenseCategoryService`]. A refusing rule's
+/// break answers 422; a rule in shadow is logged under `backbone::write_guard` and the
+/// write goes ahead.
+pub struct ExpenseCategoryRowRules;
+
+#[async_trait::async_trait]
+impl backbone_core::write_guard::WriteGuard<ExpenseCategory> for ExpenseCategoryRowRules {
+    async fn check(
+        &self,
+        ctx: &backbone_core::write_guard::WriteCtx<'_, ExpenseCategory>,
+    ) -> backbone_core::write_guard::GuardOutcome {
+        use backbone_core::row_rule as r;
+        use backbone_core::violation::Violation;
+        use backbone_core::write_guard::{GuardOutcome, WriteKind};
+        let (create, update) = (ctx.kind == WriteKind::Create, ctx.kind == WriteKind::Update);
+        let Some(after) = ctx.after.filter(|_| create || update) else {
+            return GuardOutcome::allow();
+        };
+        let Ok(row) = serde_json::to_value(after) else {
+            return GuardOutcome::allow();
+        };
+        let row = &row;
+        let old = ctx.before.and_then(|b| serde_json::to_value(b).ok());
+        let mut shadow = Vec::new();
+        let mut refuse = Vec::new();
+        // `code_required` (@required on ExpenseCategory.code)
+        if (create || (update && r::changed(old.as_ref(), row, &["code"]))) && !r::holds(&r::and(r::is_not_null(r::field(row, "code")), r::not(r::is_empty(r::trim(r::field(row, "code")))))) {
+            refuse.push(Violation::new("code", "required", "code is required"));
+        }
+        // `code_max_length` (@length(max=64) on ExpenseCategory.code)
+        if (create || (update && r::changed(old.as_ref(), row, &["code"]))) && !r::holds(&r::le(r::length(r::field(row, "code")), r::Val::Num(64.0_f64))) {
+            shadow.push(Violation::new("code", "max_length", "code must be at most 64 characters").with_param("max", 64_i64));
+        }
+        // `name_required` (@required on ExpenseCategory.name)
+        if (create || (update && r::changed(old.as_ref(), row, &["name"]))) && !r::holds(&r::and(r::is_not_null(r::field(row, "name")), r::not(r::is_empty(r::trim(r::field(row, "name")))))) {
+            refuse.push(Violation::new("name", "required", "name is required"));
+        }
+        // `name_max_length` (@length(max=200) on ExpenseCategory.name)
+        if (create || (update && r::changed(old.as_ref(), row, &["name"]))) && !r::holds(&r::le(r::length(r::field(row, "name")), r::Val::Num(200.0_f64))) {
+            shadow.push(Violation::new("name", "max_length", "name must be at most 200 characters").with_param("max", 200_i64));
+        }
+        // `expense_account_id_required` (@required on ExpenseCategory.expense_account_id)
+        if (create || (update && r::changed(old.as_ref(), row, &["expense_account_id"]))) && !r::holds(&r::and(r::is_not_null(r::field(row, "expense_account_id")), r::not(r::is_empty(r::trim(r::field(row, "expense_account_id")))))) {
+            refuse.push(Violation::new("expense_account_id", "required", "expense_account_id is required"));
+        }
+        GuardOutcome { refuse, shadow }
+    }
+}
+

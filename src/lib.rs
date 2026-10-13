@@ -192,15 +192,15 @@ impl ExpensesModuleBuilder {
 
         // Expense service
         let expense_repository = Arc::new(ExpenseRepository::new(db_pool.clone()));
-        let expense_service = Arc::new(ExpenseService::with_repository(expense_repository.clone()));
+        let expense_service = Arc::new(ExpenseService::with_repository(expense_repository.clone()).with_guard(Arc::new(crate::application::service::ExpenseRowRules)));
 
         // ExpenseCategory service
         let expense_category_repository = Arc::new(ExpenseCategoryRepository::new(db_pool.clone()));
-        let expense_category_service = Arc::new(ExpenseCategoryService::with_repository(expense_category_repository.clone()));
+        let expense_category_service = Arc::new(ExpenseCategoryService::with_repository(expense_category_repository.clone()).with_guard(Arc::new(crate::application::service::ExpenseCategoryRowRules)));
 
         // ExpenseTaxLine service
         let expense_tax_line_repository = Arc::new(ExpenseTaxLineRepository::new(db_pool.clone()));
-        let expense_tax_line_service = Arc::new(ExpenseTaxLineService::with_repository(expense_tax_line_repository.clone()));
+        let expense_tax_line_service = Arc::new(ExpenseTaxLineService::with_repository(expense_tax_line_repository.clone()).with_guard(Arc::new(crate::application::service::ExpenseTaxLineRowRules)));
 
 
         // The extension builds its own state from what the generated build made.
