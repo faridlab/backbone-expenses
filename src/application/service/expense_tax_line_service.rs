@@ -56,7 +56,7 @@ impl backbone_core::write_guard::WriteGuard<ExpenseTaxLine> for ExpenseTaxLineRo
         };
         let row = &row;
         let old = ctx.before.and_then(|b| serde_json::to_value(b).ok());
-        let mut shadow = Vec::new();
+        let shadow = Vec::new();
         let mut refuse = Vec::new();
         // `expense_id_required` (@required on ExpenseTaxLine.expense_id)
         if (create || (update && r::changed(old.as_ref(), row, &["expense_id"]))) && !r::holds(&r::and(r::is_not_null(r::field(row, "expense_id")), r::not(r::is_empty(r::trim(r::field(row, "expense_id")))))) {
@@ -68,7 +68,7 @@ impl backbone_core::write_guard::WriteGuard<ExpenseTaxLine> for ExpenseTaxLineRo
         }
         // `basis_max_length` (@length(max=32) on ExpenseTaxLine.basis)
         if (create || (update && r::changed(old.as_ref(), row, &["basis"]))) && !r::holds(&r::le(r::length(r::field(row, "basis")), r::Val::Num(32.0_f64))) {
-            shadow.push(Violation::new("basis", "max_length", "basis must be at most 32 characters").with_param("max", 32_i64));
+            refuse.push(Violation::new("basis", "max_length", "basis must be at most 32 characters").with_param("max", 32_i64));
         }
         // `account_id_required` (@required on ExpenseTaxLine.account_id)
         if (create || (update && r::changed(old.as_ref(), row, &["account_id"]))) && !r::holds(&r::and(r::is_not_null(r::field(row, "account_id")), r::not(r::is_empty(r::trim(r::field(row, "account_id")))))) {
@@ -76,7 +76,7 @@ impl backbone_core::write_guard::WriteGuard<ExpenseTaxLine> for ExpenseTaxLineRo
         }
         // `description_max_length` (@length(max=200) on ExpenseTaxLine.description)
         if (create || (update && r::changed(old.as_ref(), row, &["description"]))) && !r::holds(&r::le(r::length(r::field(row, "description")), r::Val::Num(200.0_f64))) {
-            shadow.push(Violation::new("description", "max_length", "description must be at most 200 characters").with_param("max", 200_i64));
+            refuse.push(Violation::new("description", "max_length", "description must be at most 200 characters").with_param("max", 200_i64));
         }
         GuardOutcome { refuse, shadow }
     }

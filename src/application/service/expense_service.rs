@@ -56,7 +56,7 @@ impl backbone_core::write_guard::WriteGuard<Expense> for ExpenseRowRules {
         };
         let row = &row;
         let old = ctx.before.and_then(|b| serde_json::to_value(b).ok());
-        let mut shadow = Vec::new();
+        let shadow = Vec::new();
         let mut refuse = Vec::new();
         // `employee_id_required` (@required on Expense.employee_id)
         if (create || (update && r::changed(old.as_ref(), row, &["employee_id"]))) && !r::holds(&r::and(r::is_not_null(r::field(row, "employee_id")), r::not(r::is_empty(r::trim(r::field(row, "employee_id")))))) {
@@ -72,15 +72,15 @@ impl backbone_core::write_guard::WriteGuard<Expense> for ExpenseRowRules {
         }
         // `description_max_length` (@length(max=500) on Expense.description)
         if (create || (update && r::changed(old.as_ref(), row, &["description"]))) && !r::holds(&r::le(r::length(r::field(row, "description")), r::Val::Num(500.0_f64))) {
-            shadow.push(Violation::new("description", "max_length", "description must be at most 500 characters").with_param("max", 500_i64));
+            refuse.push(Violation::new("description", "max_length", "description must be at most 500 characters").with_param("max", 500_i64));
         }
         // `currency_max_length` (@max(3) on Expense.currency)
         if (create || (update && r::changed(old.as_ref(), row, &["currency"]))) && !r::holds(&r::le(r::length(r::field(row, "currency")), r::Val::Num(3.0_f64))) {
-            shadow.push(Violation::new("currency", "max_length", "currency must be at most 3 characters").with_param("max", 3_i64));
+            refuse.push(Violation::new("currency", "max_length", "currency must be at most 3 characters").with_param("max", 3_i64));
         }
         // `reference_max_length` (@length(max=200) on Expense.reference)
         if (create || (update && r::changed(old.as_ref(), row, &["reference"]))) && !r::holds(&r::le(r::length(r::field(row, "reference")), r::Val::Num(200.0_f64))) {
-            shadow.push(Violation::new("reference", "max_length", "reference must be at most 200 characters").with_param("max", 200_i64));
+            refuse.push(Violation::new("reference", "max_length", "reference must be at most 200 characters").with_param("max", 200_i64));
         }
         GuardOutcome { refuse, shadow }
     }

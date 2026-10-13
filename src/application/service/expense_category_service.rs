@@ -56,7 +56,7 @@ impl backbone_core::write_guard::WriteGuard<ExpenseCategory> for ExpenseCategory
         };
         let row = &row;
         let old = ctx.before.and_then(|b| serde_json::to_value(b).ok());
-        let mut shadow = Vec::new();
+        let shadow = Vec::new();
         let mut refuse = Vec::new();
         // `code_required` (@required on ExpenseCategory.code)
         if (create || (update && r::changed(old.as_ref(), row, &["code"]))) && !r::holds(&r::and(r::is_not_null(r::field(row, "code")), r::not(r::is_empty(r::trim(r::field(row, "code")))))) {
@@ -64,7 +64,7 @@ impl backbone_core::write_guard::WriteGuard<ExpenseCategory> for ExpenseCategory
         }
         // `code_max_length` (@length(max=64) on ExpenseCategory.code)
         if (create || (update && r::changed(old.as_ref(), row, &["code"]))) && !r::holds(&r::le(r::length(r::field(row, "code")), r::Val::Num(64.0_f64))) {
-            shadow.push(Violation::new("code", "max_length", "code must be at most 64 characters").with_param("max", 64_i64));
+            refuse.push(Violation::new("code", "max_length", "code must be at most 64 characters").with_param("max", 64_i64));
         }
         // `name_required` (@required on ExpenseCategory.name)
         if (create || (update && r::changed(old.as_ref(), row, &["name"]))) && !r::holds(&r::and(r::is_not_null(r::field(row, "name")), r::not(r::is_empty(r::trim(r::field(row, "name")))))) {
@@ -72,7 +72,7 @@ impl backbone_core::write_guard::WriteGuard<ExpenseCategory> for ExpenseCategory
         }
         // `name_max_length` (@length(max=200) on ExpenseCategory.name)
         if (create || (update && r::changed(old.as_ref(), row, &["name"]))) && !r::holds(&r::le(r::length(r::field(row, "name")), r::Val::Num(200.0_f64))) {
-            shadow.push(Violation::new("name", "max_length", "name must be at most 200 characters").with_param("max", 200_i64));
+            refuse.push(Violation::new("name", "max_length", "name must be at most 200 characters").with_param("max", 200_i64));
         }
         // `expense_account_id_required` (@required on ExpenseCategory.expense_account_id)
         if (create || (update && r::changed(old.as_ref(), row, &["expense_account_id"]))) && !r::holds(&r::and(r::is_not_null(r::field(row, "expense_account_id")), r::not(r::is_empty(r::trim(r::field(row, "expense_account_id")))))) {
