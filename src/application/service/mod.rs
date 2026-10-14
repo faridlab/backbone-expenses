@@ -19,5 +19,29 @@ pub use expense_service::ExpenseRowRules;
 pub use expense_category_service::ExpenseCategoryRowRules;
 pub use expense_tax_line_service::ExpenseTaxLineRowRules;
 
+/// A `ExpenseService` over `repository` with its write guard attached: the way to build it, so its writes are
+/// served only with the rules the schema declares.
+pub fn build_expense_service(
+    repository: std::sync::Arc<crate::infrastructure::persistence::ExpenseRepository>,
+) -> ExpenseService {
+    ExpenseService::with_repository(repository).with_guard(std::sync::Arc::new(ExpenseRowRules))
+}
+
+/// A `ExpenseCategoryService` over `repository` with its write guard attached: the way to build it, so its writes are
+/// served only with the rules the schema declares.
+pub fn build_expense_category_service(
+    repository: std::sync::Arc<crate::infrastructure::persistence::ExpenseCategoryRepository>,
+) -> ExpenseCategoryService {
+    ExpenseCategoryService::with_repository(repository).with_guard(std::sync::Arc::new(ExpenseCategoryRowRules))
+}
+
+/// A `ExpenseTaxLineService` over `repository` with its write guard attached: the way to build it, so its writes are
+/// served only with the rules the schema declares.
+pub fn build_expense_tax_line_service(
+    repository: std::sync::Arc<crate::infrastructure::persistence::ExpenseTaxLineRepository>,
+) -> ExpenseTaxLineService {
+    ExpenseTaxLineService::with_repository(repository).with_guard(std::sync::Arc::new(ExpenseTaxLineRowRules))
+}
+
 // This directory's extension (hand-written; ADR-0031).
 include!("mod.ext.rs");
