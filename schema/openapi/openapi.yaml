@@ -1206,11 +1206,9 @@ components:
         - expense_date
         - description
         - amount_total
-        - currency
         - payment_mode
         - approval_state
         - state
-        - metadata
       properties:
         employee_id:
           type: string
@@ -1257,8 +1255,6 @@ components:
           nullable: true
           type: string
           format: uuid
-        metadata:
-          type: object
 
     UpdateExpenseRequest:
       type: object
@@ -1272,7 +1268,6 @@ components:
         - payment_mode
         - approval_state
         - state
-        - metadata
       properties:
         employee_id:
           type: string
@@ -1319,8 +1314,6 @@ components:
           nullable: true
           type: string
           format: uuid
-        metadata:
-          type: object
 
     PatchExpenseRequest:
       type: object
@@ -1370,8 +1363,6 @@ components:
           nullable: true
           type: string
           format: uuid
-        metadata:
-          type: object
 
     ExpenseList:
       type: object
@@ -1436,7 +1427,6 @@ components:
         - code
         - name
         - expense_account_id
-        - metadata
       properties:
         code:
           type: string
@@ -1457,8 +1447,6 @@ components:
         cap_per_month:
           nullable: true
           type: string
-        metadata:
-          type: object
 
     UpdateExpenseCategoryRequest:
       type: object
@@ -1466,7 +1454,6 @@ components:
         - code
         - name
         - expense_account_id
-        - metadata
       properties:
         code:
           type: string
@@ -1487,8 +1474,6 @@ components:
         cap_per_month:
           nullable: true
           type: string
-        metadata:
-          type: object
 
     PatchExpenseCategoryRequest:
       type: object
@@ -1512,8 +1497,6 @@ components:
         cap_per_month:
           nullable: true
           type: string
-        metadata:
-          type: object
 
     ExpenseCategoryList:
       type: object
@@ -1578,7 +1561,6 @@ components:
         - account_id
         - rate
         - tax_amount
-        - metadata
       properties:
         expense_id:
           type: string
@@ -1595,8 +1577,6 @@ components:
           type: string
         tax_amount:
           type: string
-        metadata:
-          type: object
 
     UpdateExpenseTaxLineRequest:
       type: object
@@ -1606,7 +1586,6 @@ components:
         - account_id
         - rate
         - tax_amount
-        - metadata
       properties:
         expense_id:
           type: string
@@ -1623,8 +1602,6 @@ components:
           type: string
         tax_amount:
           type: string
-        metadata:
-          type: object
 
     PatchExpenseTaxLineRequest:
       type: object
@@ -1644,8 +1621,6 @@ components:
           type: string
         tax_amount:
           type: string
-        metadata:
-          type: object
 
     ExpenseTaxLineList:
       type: object

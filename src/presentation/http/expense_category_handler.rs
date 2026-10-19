@@ -81,6 +81,13 @@ impl axum::response::IntoResponse for ExpenseCategoryError {
 // Route Configuration
 // =============================================================================
 
+/// The permissions this entity's generic routes require: `expense_category:<action>` for `read`, `create`,
+/// `update`, `delete`, `restore` and `purge`, with any rename the schema's `requires:` declares.
+pub fn expense_category_permissions() -> backbone_core::http::CrudPermissions {
+    backbone_core::http::CrudPermissions::new("expense_category")
+        .in_module("expenses")
+}
+
 /// Create Axum router with all 16 Backbone endpoints for ExpenseCategory.
 ///
 /// # Routes
@@ -110,21 +117,23 @@ impl axum::response::IntoResponse for ExpenseCategoryError {
 /// let router = create_expense_category_routes(service);
 /// ```
 pub fn create_expense_category_routes(service: Arc<ExpenseCategoryService>) -> Router {
-    BackboneCrudHandler::<ExpenseCategoryService, ExpenseCategory, CreateExpenseCategoryDto, UpdateExpenseCategoryDto, ExpenseCategoryResponseDto>::routes(
+    BackboneCrudHandler::<ExpenseCategoryService, ExpenseCategory, CreateExpenseCategoryDto, UpdateExpenseCategoryDto, ExpenseCategoryResponseDto>::routes_guarded(
         service,
         "/expense_categories",
+        expense_category_permissions(),
     )
 }
 
 /// Create Axum router with only the read (GET) endpoints for ExpenseCategory.
 ///
-/// Safe for public, unauthenticated exposure (e.g., reference data).
+/// Each route requires the entity's `read` permission, so it needs an authenticated caller.
 /// Mutations must be served separately via `create_expense_category_write_routes`,
 /// typically wrapped in an auth middleware layer.
 pub fn create_expense_category_read_routes(service: Arc<ExpenseCategoryService>) -> Router {
-    BackboneCrudHandler::<ExpenseCategoryService, ExpenseCategory, CreateExpenseCategoryDto, UpdateExpenseCategoryDto, ExpenseCategoryResponseDto>::read_routes(
+    BackboneCrudHandler::<ExpenseCategoryService, ExpenseCategory, CreateExpenseCategoryDto, UpdateExpenseCategoryDto, ExpenseCategoryResponseDto>::read_routes_guarded(
         service,
         "/expense_categories",
+        expense_category_permissions(),
     )
 }
 
@@ -140,9 +149,10 @@ pub fn create_expense_category_read_routes(service: Arc<ExpenseCategoryService>)
 /// service (e.g. a command router over its domain engine), serve THAT instead
 /// for any mutation that must respect domain rules.
 pub fn create_expense_category_write_routes(service: Arc<ExpenseCategoryService>) -> Router {
-    BackboneCrudHandler::<ExpenseCategoryService, ExpenseCategory, CreateExpenseCategoryDto, UpdateExpenseCategoryDto, ExpenseCategoryResponseDto>::write_routes(
+    BackboneCrudHandler::<ExpenseCategoryService, ExpenseCategory, CreateExpenseCategoryDto, UpdateExpenseCategoryDto, ExpenseCategoryResponseDto>::write_routes_guarded(
         service,
         "/expense_categories",
+        expense_category_permissions(),
     )
 }
 

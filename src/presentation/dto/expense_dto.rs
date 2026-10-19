@@ -46,6 +46,7 @@ pub struct CreateExpenseDto {
     #[serde(alias = "amount_total")]
     pub amount_total: Decimal,
     #[cfg_attr(feature = "openapi", schema(example = "example"))]
+    #[serde(default = "default_create_expense_currency")]
     pub currency: String,
     #[serde(alias = "payment_mode")]
     pub payment_mode: ExpensePaymentMode,
@@ -64,6 +65,10 @@ pub struct CreateExpenseDto {
     pub reimbursement_id: Option<Uuid>,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "receipt_file_id")]
     pub receipt_file_id: Option<Uuid>,
+}
+
+fn default_create_expense_currency() -> String {
+    "IDR".to_string()
 }
 
 // =============================================================================
@@ -143,22 +148,22 @@ pub struct PatchExpenseDto {
     pub currency: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", alias = "payment_mode")]
     pub payment_mode: Option<ExpensePaymentMode>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub reference: Option<String>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option")]
+    pub reference: Option<Option<String>>,
     #[serde(skip_serializing_if = "Option::is_none", alias = "approval_state")]
     pub approval_state: Option<ExpenseApprovalState>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub state: Option<ExpenseState>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "approval_request_id")]
-    pub approval_request_id: Option<Uuid>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "journal_id")]
-    pub journal_id: Option<Uuid>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "accounting_post_id")]
-    pub accounting_post_id: Option<Uuid>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "reimbursement_id")]
-    pub reimbursement_id: Option<Uuid>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "receipt_file_id")]
-    pub receipt_file_id: Option<Uuid>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option", alias = "approval_request_id")]
+    pub approval_request_id: Option<Option<Uuid>>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option", alias = "journal_id")]
+    pub journal_id: Option<Option<Uuid>>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option", alias = "accounting_post_id")]
+    pub accounting_post_id: Option<Option<Uuid>>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option", alias = "reimbursement_id")]
+    pub reimbursement_id: Option<Option<Uuid>>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option", alias = "receipt_file_id")]
+    pub receipt_file_id: Option<Option<Uuid>>,
 }
 
 impl PatchExpenseDto {
@@ -380,12 +385,4 @@ impl backbone_core::ApplyUpdateDto<UpdateExpenseDto> for Expense {
         Ok(self)
     }
 }
-
-// =============================================================================
-// Custom DTOs
-// =============================================================================
-
-// Add custom DTOs specific to Expense here.
-// This section will be preserved during regeneration.
-// >>> END CUSTOM DTOs
 

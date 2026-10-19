@@ -96,14 +96,14 @@ pub struct PatchExpenseCategoryDto {
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     #[serde(skip_serializing_if = "Option::is_none", alias = "expense_account_id")]
     pub expense_account_id: Option<Uuid>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "default_tax_rate")]
-    pub default_tax_rate: Option<Decimal>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "cap_per_claim")]
-    pub cap_per_claim: Option<Decimal>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "cap_per_month")]
-    pub cap_per_month: Option<Decimal>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option", alias = "default_tax_rate")]
+    pub default_tax_rate: Option<Option<Decimal>>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option")]
+    pub description: Option<Option<String>>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option", alias = "cap_per_claim")]
+    pub cap_per_claim: Option<Option<Decimal>>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option", alias = "cap_per_month")]
+    pub cap_per_month: Option<Option<Decimal>>,
 }
 
 impl PatchExpenseCategoryDto {
@@ -283,12 +283,4 @@ impl backbone_core::ApplyUpdateDto<UpdateExpenseCategoryDto> for ExpenseCategory
         Ok(self)
     }
 }
-
-// =============================================================================
-// Custom DTOs
-// =============================================================================
-
-// Add custom DTOs specific to ExpenseCategory here.
-// This section will be preserved during regeneration.
-// >>> END CUSTOM DTOs
 
